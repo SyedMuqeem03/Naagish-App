@@ -1,4 +1,4 @@
-# Mobile Application for Real-Time Voice-to-Text and Text-to-Voice Translation
+# Indian Nagish App
 
 ## Project Overview
 This is a mobile application aimed at providing real-time voice-to-text and text-to-voice translation for Indian regional languages. The app is designed to assist individuals with hearing and speech impairments by offering both online and offline functionalities, ensuring accessibility in areas with poor connectivity.
