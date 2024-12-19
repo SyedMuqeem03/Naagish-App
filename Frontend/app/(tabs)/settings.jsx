@@ -19,7 +19,6 @@ export default function Settings() {
   const [selectedLanguage, setSelectedLanguage] = useState('Hindi');
   const [visibleEmail, setVisibleEmail] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState('Personal Email');
-
   const [username, setUsername] = useState('username');
   const [newUsername, setNewUsername] = useState('');
   const [visibleUsernameModal, setVisibleUsernameModal] = useState(false);
@@ -60,165 +59,145 @@ export default function Settings() {
     Keyboard.dismiss(); 
   };
 
-
   return (
-
     <View style={styles.navcontainer}>
-    {/* Navigation Header */}
-    <View style={styles.navHeader}>
-      <Text style={styles.navHeaderText}>Settings</Text>
-      <TouchableOpacity onPress={() => alert('list pressed!')}>
-        <Image
-          source={require('../list.png')} // Ensure this path is correct
-          style={styles.list}
-        />
-      </TouchableOpacity>
+      <View style={styles.navHeader}>
+        <Text style={styles.navHeaderText}>Settings</Text>
+        <TouchableOpacity onPress={() => alert('list pressed!')}>
+          <Image source={require('../list.png')} style={styles.list}/>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.container}>
+        <TouchableWithoutFeedback onPress={handleOutsidePress}>
+          <View style={styles.innerContainer}>
+            <Image source={require('@/assets/images/manuser.png')} style={styles.image}/>
+            <TouchableOpacity onPress={() => setVisibleUsernameModal(true)}>
+              <Text style={styles.username}>{username}</Text>
+            </TouchableOpacity>
+
+            <View style={styles.row}>
+              <Text style={styles.heading}>Region:</Text>
+              <TouchableOpacity onPress={() => setVisibleRegion(true)}>
+                <View style={styles.box}>
+                  <Text style={styles.selected}>{selectedRegion}</Text>
+                </View>
+              </TouchableOpacity>
+              <Modal visible={visibleRegion} transparent={true}>
+                <TouchableWithoutFeedback onPress={handleOutsidePress}>
+                  <View style={styles.modal}>
+                    <FlatList
+                      data={regions}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity onPress={() => {
+                          setSelectedRegion(item.value);
+                          setVisibleRegion(false);
+                        }}>
+                          <Text style={styles.option}>{item.label}</Text>
+                        </TouchableOpacity>
+                      )}
+                      keyExtractor={(item) => item.value}
+                    />
+                    <TouchableOpacity style={styles.closeButton} onPress={() => setVisibleRegion(false)}>
+                      <Text style={styles.closeButtonText}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableWithoutFeedback>
+              </Modal>
+            </View>
+
+            <View style={styles.row}>
+              <Text style={styles.heading}>Language:</Text>
+              <TouchableOpacity onPress={() => setVisibleLanguage(true)}>
+                <View style={styles.box}>
+                  <Text style={styles.selected}>{selectedLanguage}</Text>
+                </View>
+              </TouchableOpacity>
+              <Modal visible={visibleLanguage} transparent={true}>
+                <TouchableWithoutFeedback onPress={handleOutsidePress}>
+                  <View style={styles.modal}>
+                    <FlatList
+                      data={languages}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity onPress={() => {
+                          setSelectedLanguage(item.value);
+                          setVisibleLanguage(false);
+                        }}>
+                          <Text style={styles.option}>{item.label}</Text>
+                        </TouchableOpacity>
+                      )}
+                      keyExtractor={(item) => item.value}
+                    />
+                    <TouchableOpacity style={styles.closeButton} onPress={() => setVisibleLanguage(false)}>
+                      <Text style={styles.closeButtonText}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableWithoutFeedback>
+              </Modal>
+            </View>
+
+            <View style={styles.row}>
+              <Text style={styles.heading}>Email:</Text>
+              <TouchableOpacity onPress={() => setVisibleEmail(true)}>
+                <View style={styles.box}>
+                  <Text style={styles.selected}>{selectedEmail}</Text>
+                </View>
+              </TouchableOpacity>
+              <Modal visible={visibleEmail} transparent={true}>
+                <TouchableWithoutFeedback onPress={handleOutsidePress}>
+                  <View style={styles.modal}>
+                    <FlatList
+                      data={emails}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity onPress={() => {
+                          setSelectedEmail(item.value);
+                          setVisibleEmail(false);
+                        }}>
+                          <Text style={styles.option}>{item.label}</Text>
+                        </TouchableOpacity>
+                      )}
+                      keyExtractor={(item) => item.value}
+                    />
+                    <TouchableOpacity style={styles.closeButton} onPress={() => setVisibleEmail(false)}>
+                      <Text style={styles.closeButtonText}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableWithoutFeedback>
+              </Modal>
+            </View>
+
+            <Modal visible={visibleUsernameModal} transparent={true}>
+              <TouchableWithoutFeedback onPress={handleOutsidePress}>
+                <View style={styles.modalContainer}>
+                  <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Change Username</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter new username"
+                      value={newUsername}
+                      onChangeText={setNewUsername}
+                    />
+                    <TouchableOpacity style={styles.submitButton} onPress={updateUsername}>
+                      <Text style={styles.submitButtonText}>Submit</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
+            </Modal>
+          </View>
+        </TouchableWithoutFeedback>
+      </View>
     </View>
-
-    <View style={styles.container}>
-      {/* Main Content Wrapper */}
-      <TouchableWithoutFeedback onPress={handleOutsidePress}>
-        <View style={styles.innerContainer}>
-          {/* Profile Section */}
-          <Image 
-            source={require('@/assets/images/manuser.png')} // Ensure this path is correct
-            style={styles.image}
-          />
-          <TouchableOpacity onPress={() => setVisibleUsernameModal(true)}>
-            <Text style={styles.username}>{username}</Text>
-          </TouchableOpacity>
-
-          {/* Region Selector */}
-          <View style={styles.row}>
-            <Text style={styles.heading}>Region:</Text>
-            <TouchableOpacity onPress={() => setVisibleRegion(true)}>
-              <View style={styles.box}>
-                <Text style={styles.selected}>{selectedRegion}</Text>
-              </View>
-            </TouchableOpacity>
-            <Modal visible={visibleRegion} transparent={true}>
-              <TouchableWithoutFeedback onPress={handleOutsidePress}>
-                <View style={styles.modal}>
-                  <FlatList
-                    data={regions}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity onPress={() => {
-                        setSelectedRegion(item.value);
-                        setVisibleRegion(false);
-                      }}>
-                        <Text style={styles.option}>{item.label}</Text>
-                      </TouchableOpacity>
-                    )}
-                    keyExtractor={(item) => item.value}
-                  />
-                  <TouchableOpacity style={styles.closeButton} onPress={() => setVisibleRegion(false)}>
-                    <Text style={styles.closeButtonText}>Close</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableWithoutFeedback>
-            </Modal>
-          </View>
-
-          {/* Language Selector */}
-          <View style={styles.row}>
-            <Text style={styles.heading}>Language:</Text>
-            <TouchableOpacity onPress={() => setVisibleLanguage(true)}>
-              <View style={styles.box}>
-                <Text style={styles.selected}>{selectedLanguage}</Text>
-              </View>
-            </TouchableOpacity>
-            <Modal visible={visibleLanguage} transparent={true}>
-              <TouchableWithoutFeedback onPress={handleOutsidePress}>
-                <View style={styles.modal}>
-                  <FlatList
-                    data={languages}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity onPress={() => {
-                        setSelectedLanguage(item.value);
-                        setVisibleLanguage(false);
-                      }}>
-                        <Text style={styles.option}>{item.label}</Text>
-                      </TouchableOpacity>
-                    )}
-                    keyExtractor={(item) => item.value}
-                  />
-                  <TouchableOpacity style={styles.closeButton} onPress={() => setVisibleLanguage(false)}>
-                    <Text style={styles.closeButtonText}>Close</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableWithoutFeedback>
-            </Modal>
-          </View>
-
-          {/* Email Selector */}
-          <View style={styles.row}>
-            <Text style={styles.heading}>Email:</Text>
-            <TouchableOpacity onPress={() => setVisibleEmail(true)}>
-              <View style={styles.box}>
-                <Text style={styles.selected}>{selectedEmail}</Text>
-              </View>
-            </TouchableOpacity>
-            <Modal visible={visibleEmail} transparent={true}>
-              <TouchableWithoutFeedback onPress={handleOutsidePress}>
-                <View style={styles.modal}>
-                  <FlatList
-                    data={emails}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity onPress={() => {
-                        setSelectedEmail(item.value);
-                        setVisibleEmail(false);
-                      }}>
-                        <Text style={styles.option}>{item.label}</Text>
-                      </TouchableOpacity>
-                    )}
-                    keyExtractor={(item) => item.value}
-                  />
-                  <TouchableOpacity style={styles.closeButton} onPress={() => setVisibleEmail(false)}>
-                    <Text style={styles.closeButtonText}>Close</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableWithoutFeedback>
-            </Modal>
-          </View>
-
-          {/* Username Change Modal */}
-          <Modal visible={visibleUsernameModal} transparent={true}>
-            <TouchableWithoutFeedback onPress={handleOutsidePress}>
-              <View style={styles.modalContainer}>
-                <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>Change Username</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter new username"
-                    value={newUsername}
-                    onChangeText={setNewUsername}
-                  />
-                  <TouchableOpacity style={styles.submitButton} onPress={updateUsername}>
-                    <Text style={styles.submitButtonText}>Submit</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </Modal>
-        </View>
-      </TouchableWithoutFeedback>
-    </View>
-  </View>
-     
   );
-};
+}
 
 const styles = StyleSheet.create({
-
   navcontainer:{
     flex: 1,
     justifyContent: 'space-between',
     padding: 0,
     backgroundColor: '#f9f9f9',
     alignItems:'center',
-
-    // paddingTop:10,
-
   },
   container: {
     flex: 1,
@@ -228,25 +207,11 @@ const styles = StyleSheet.create({
     justifyContent:"center",
     alignItems:'center',
     paddingLeft:50,
-
-    // paddingTop:10,
-
   },
-  // container: {
-  //   flex: 1,
-  //   justifyContent: 'center', // Center the content vertically
-  //   alignItems: 'center', // Center the content horizontally
-  //   padding: 20,
-  //   backgroundColor: '#f9f9f9',
-  // },
   image: {
     width: 150, 
     height: 150, 
-    // marginBottom: 60,
     borderRadius: 100,
-    // width: 120,
-    // height: 120,
-    // borderRadius: 50,
     marginLeft:50,
     marginBottom:40,
   },
@@ -344,12 +309,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  // container: {
-  //   flex: 0,
-  //   justifyContent: 'space-between',
-  //   padding: 100,
-  //   backgroundColor: '#f9f9f9',
-  // },
   navHeader: {
     backgroundColor: '#007AF5',
     paddingTop: 30,
@@ -374,5 +333,3 @@ const styles = StyleSheet.create({
     bottom: 20,
   },
 });
-
-// export default Settings;

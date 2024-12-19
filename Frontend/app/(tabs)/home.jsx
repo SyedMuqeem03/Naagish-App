@@ -1,24 +1,3 @@
-// import { View, Text, StyleSheet, Image } from 'react-native';
-// import React from 'react';
-
-// export default function home() {
-//   return (
-//     <View>
-//       <View style={styles.header}>
-//         <Text style={styles.headerText}>Home</Text>
-//         <Image
-//           source={require('../list.png')} 
-//           style={styles.list}  
-//           onPress={() => alert('list pressed!')}
-//         />
-//       </View>
-//     </View>
-//   );
-// }
-
-
-
-
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -45,98 +24,15 @@ const Home = () => {
   };
 
   return (
-   
-//     <View>
-//   <View style={styles.header}>
-//     <Text style={styles.headerText}>Home</Text>
-//     <TouchableOpacity onPress={() => alert('list pressed!')}>
-//       <Image
-//         source={require('../list.png')} 
-//         style={styles.list}  
-//       />
-//     </TouchableOpacity>
-//   </View>
-// </View>
-
-
-
-//     <View style={styles.container}>
-
-
-
-//       {/* Image with onPress event like dabaye to takes to settings page after asking*/}
-//       <TouchableOpacity onPress={handleImagePress}>
-//         <Image 
-//           source={require('./manuser.png')} 
-//           style={[styles.userImage, isImageExpanded && styles.expandedImage]} 
-//         />
-//       </TouchableOpacity>
-
-//       <Text style={styles.title}>Hello! User</Text>
-//       <Text style={styles.subTitle}>Ready to translate?</Text>
-//       <Text style={styles.subTitle}>Communicate seamlessly in any language</Text>
-
-//       <View style={styles.boxContainer}>
-//         <TouchableOpacity style={styles.box} onPress={() => navigation.navigate('Conversation')}>
-//           <View style={styles.innerBox}>
-//             <Image 
-//               source={require('./chat.png')} 
-//               style={styles.image}
-//               resizeMode="contain"
-//             />
-//             <Text style={styles.boxText}>Conversation</Text>
-//           </View>
-//         </TouchableOpacity>
-
-//         <TouchableOpacity style={styles.box} onPress={() => navigation.navigate('Translation')}>
-//           <View style={styles.innerBox}>
-//             <Image 
-//               source={require('./lang.png')} 
-//               style={styles.image}
-//               resizeMode="contain"
-//             />
-//             <Text style={styles.boxText}>Language Translation</Text>
-//           </View>
-//         </TouchableOpacity>
-//       </View>
-
-//       {}
-//       <Modal
-//         transparent={true}
-//         visible={isModalVisible}
-//         animationType="fade"
-//       >
-//         <View style={styles.modalContainer}>
-//           <View style={styles.modalContent}>
-//             <Text style={styles.modalText}>Go to Settings?</Text>
-//             <View style={styles.modalButtons}>
-//               <TouchableOpacity style={styles.modalButton} onPress={handleNavigateToSettings}>
-//                 <Text style={styles.modalButtonText}>Yes</Text>
-//               </TouchableOpacity>
-//               <TouchableOpacity style={styles.modalButton} onPress={handleCloseModal}>
-//                 <Text style={styles.modalButtonText}>No</Text>
-//               </TouchableOpacity>
-//             </View>
-//           </View>
-//         </View>
-//       </Modal>
-//     </View>
-
-<View>
-      {/* Header */}
+    <View>
       <View style={styles.header}>
         <Text style={styles.headerText}>Home</Text>
         <TouchableOpacity onPress={() => alert('list pressed!')}>
-          <Image
-            source={require('../list.png')}
-            style={styles.list}
-          />
+          <Image source={require('../list.png')} style={styles.list} />
         </TouchableOpacity>
       </View>
 
-      {/* Main Container */}
       <View style={styles.container}>
-        {/* Image with onPress event that opens the modal */}
         <TouchableOpacity onPress={handleImagePress}>
           <Image
             source={require('./manuser.png')}
@@ -148,37 +44,23 @@ const Home = () => {
         <Text style={styles.subTitle}>Ready to translate?</Text>
         <Text style={styles.subTitle}>Communicate seamlessly in any language</Text>
 
-        {/* Boxes for Conversation and Language Translation */}
         <View style={styles.boxContainer}>
           <TouchableOpacity style={styles.box} onPress={() => navigation.navigate('convo')}>
             <View style={styles.innerBox}>
-              <Image
-                source={require('./chat.png')}
-                style={styles.image}
-                resizeMode="contain"
-              />
+              <Image source={require('./chat.png')} style={styles.image} resizeMode="contain" />
               <Text style={styles.boxText}>Conversation</Text>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.box} onPress={() => navigation.navigate('main')}>
             <View style={styles.innerBox}>
-              <Image
-                source={require('./lang.png')}
-                style={styles.image}
-                resizeMode="contain"
-              />
+              <Image source={require('./lang.png')} style={styles.image} resizeMode="contain" />
               <Text style={styles.boxText}>Language Translation</Text>
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Modal for asking if the user wants to go to settings */}
-        <Modal
-          transparent={true}
-          visible={isModalVisible}
-          animationType="fade"
-        >
+        <Modal transparent={true} visible={isModalVisible} animationType="fade">
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
               <Text style={styles.modalText}>Go to Settings?</Text>
@@ -194,7 +76,7 @@ const Home = () => {
           </View>
         </Modal>
       </View>
-      </View>
+    </View>
   );
 };
 
