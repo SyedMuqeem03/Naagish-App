@@ -7,15 +7,24 @@ import {
   Image,
   TextInput,
   FlatList,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
+// import axios from 'axios';
 
-export default function ConvoScreen() {
-  const [text, setText] = useState("");
+export default function Convo() {
+  const [isUp, setIsUp] = useState(false);
   const [base64String, setBase64String] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [sound, setSound] = useState(null);
+  const [recording, setRecording] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [translatedText, setTranslatedText] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState(undefined);
 
   useEffect(() => {
     return () => {
@@ -60,192 +69,244 @@ export default function ConvoScreen() {
     }
   };
 
-  const translateAndSpeak = async () => {
-    const apiEndpoint = "https://tts-api-kohl.vercel.app/translate_and_speak";
-    const requestBody = {
-      text: "'హ్యాపీ బర్త్‌డే హ్యాపీ బర్త్‌డే హ్యాపీ బర్త్‌డే హ్యాపీ బర్త్‌డే హ్యాపీ బర్త్‌డే'",
-      language: "hi-IN",
-      target_language: "hindi",
-      voice_model: "arvind",
-    };
+  const translateAndSpeak = async (transcriptText) => {
+    if (!transcriptText) {
+      console.error("No transcript to translate");
+      return;
+    }
 
     try {
+      const apiEndpoint = "https://tts-api-kohl.vercel.app/translate_and_speak";
+      const requestBody = {
+        text: transcriptText,
+        language: IsselectedLanguage.code || "hi-IN",
+        target_language: IsselectedLanguage.name?.toLowerCase() || "telugu",
+        voice_model: "arvind",
+      };
+
       const response = await fetch(apiEndpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
 
       if (response.ok) {
-        const audioUrl = await response.text();
-        const jsonObject = JSON.parse(audioUrl);
-        setBase64String(jsonObject["audio_data"]);
-        playBase64Audio(jsonObject["audio_data"]);
-        alert("Success", "Translation and speech processed!");
-      } else {
-        console.error("API Error:", response.status);
-        alert("Error", "Failed to process translation and speech.");
+        const jsonResponse = await response.json();
+        setBase64String(jsonResponse.audio_data);
+        setTranslatedText(jsonResponse.translated_text);
+        await playBase64Audio(jsonResponse.audio_data);
       }
     } catch (error) {
-      console.error("Error:", error);
-      alert("Error", "Something went wrong.");
+      console.error("Translation error:", error);
+      Alert.alert("Error", "Translation failed");
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      console.log("Requesting permissions..");
+      await Audio.requestPermissionsAsync();
+
+      console.log("Starting recording..");
+      const { recording } = await Audio.Recording.createAsync({
+        android: {
+          extension: ".wav",
+          outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_WAVE,
+          audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
+          sampleRate: 44100,
+          numberOfChannels: 2,
+          bitRate: 128000,
+        },
+        ios: {
+          extension: ".wav",
+          audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_MAX,
+          sampleRate: 44100,
+          numberOfChannels: 2,
+          bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+      });
+      setRecording(recording);
+      console.log("Recording started");
+    } catch (err) {
+      console.error("Failed to start recording", err);
+      setError(err.message);
+    }
+  };
+
+  const stopRecording = async () => {
+    setIsProcessing(true);
+    try {
+      console.log("Stopping recording..");
+      setRecording(undefined);
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      console.log("Recording stopped and stored at", uri);
+      console.log(recording);
+
+      try {
+        let form = new FormData();
+        // Log the URI and file object
+        console.log("Audio URI:", uri);
+
+        const fileToUpload = {
+          uri: uri,
+          type: "audio/wav",
+          name: "recording.wav",
+        };
+        console.log("File object:", fileToUpload);
+
+        form.append("file", fileToUpload);
+        form.append(
+          "language_code",
+          !isUp
+            ? IsselectedLanguage["code"] === ""
+              ? "hi-IN"
+              : IsselectedLanguage["code"]
+            : selectedLanguage["code"] === ""
+            ? "hi-IN"
+            : selectedLanguage["code"]
+        );
+        form.append("model", "saarika:v1");
+
+        const options = {
+          method: "POST",
+          headers: {
+            "api-subscription-key": "7681997b-fff6-4626-8791-9fef034d19d2",
+            Accept: "application/json",
+            // Remove Content-Type to let FormData set it with boundary
+          },
+          body: form,
+        };
+
+        console.log(form);
+
+        console.log("Sending request to Sarvam API...");
+        const response = await fetch(
+          "https://api.sarvam.ai/speech-to-text",
+          options
+        );
+        console.log("Response status:", response.status);
+
+        // Get response text first
+        const responseText = await response.text();
+        console.log("Response text:", responseText);
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${responseText}`);
+        }
+
+        // Parse JSON only if we have valid JSON response
+        const data = JSON.parse(responseText);
+        console.log("Parsed response:", data);
+        setTranscript(data.transcript || ""); // Store transcript
+        return data;
+      } catch (error) {
+        console.error("Transcription error:", error);
+        setError(`Failed to transcribe: ${error.message}`);
+        setTranscript("Error transcribing audio");
+        throw error;
+      }
+    } catch (error) {
+      console.error("Error in stopRecording:", error);
+    } finally {
+      setIsProcessing(false);
+    }
+    return false;
+  };
+
+  const handleRecordingProcess = async () => {
+    console.log("hello");
+
+    if (recording) {
+      setIsProcessing(true);
+      try {
+        // 1. Stop recording and get transcript
+        const transcriptionData = await stopRecording();
+
+        if (transcriptionData && transcriptionData.transcript) {
+          // 2. Send transcript for translation
+          const apiEndpoint =
+            "https://tts-api-kohl.vercel.app/translate_and_speak";
+          console.log("IsSelected Language:", IsselectedLanguage);
+          console.log("isSelected Language name:", IsselectedLanguage["name"]);
+          console.log("IsSelected Language code:", IsselectedLanguage["code"]);
+
+          console.log("Selected Language:", selectedLanguage);
+          console.log("Selected Language name:", selectedLanguage["name"]);
+          console.log("Selected Language code:", selectedLanguage["code"]);
+
+          const requestBody = {
+            text: transcriptionData.transcript,
+            language: !isUp
+              ? IsselectedLanguage["code"] === ""
+                ? "hi-IN"
+                : IsselectedLanguage["code"]
+              : selectedLanguage["code"] === ""
+              ? "hi-IN"
+              : selectedLanguage["code"],
+            target_language: !isUp
+              ? selectedLanguage["name"].toLowerCase() === ""
+                ? "telugu"
+                : selectedLanguage["name"].toLowerCase()
+              : IsselectedLanguage["name"].toLowerCase() === ""
+              ? "telugu"
+              : IsselectedLanguage["name"].toLowerCase(),
+            voice_model: "arvind",
+          };
+
+          // 3. Make translation request
+          const response = await fetch(apiEndpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          // 4. Handle translation response and play audio
+          if (response.ok) {
+            const audioUrl = await response.text();
+            const jsonObject = JSON.parse(audioUrl);
+            setBase64String(jsonObject["audio_data"]);
+            setTranslatedText(jsonObject["translated_text"]);
+            await playBase64Audio(jsonObject["audio_data"]);
+          }
+        }
+      } catch (error) {
+        console.error("Recording process error:", error);
+        Alert.alert("Error", "Failed to process recording");
+      } finally {
+        setIsProcessing(false);
+      }
+    } else {
+      // Start new recording
+      await startRecording();
     }
   };
 
   const languages_list = [
-    { name: "Afrikaans", code: "af" },
-    { name: "Albanian - shqip", code: "sq" },
-    { name: "Amharic - አማርኛ", code: "am" },
-    { name: "Arabic - العربية", code: "ar" },
-    { name: "Aragonese - aragonés", code: "an" },
-    { name: "Armenian - հայերեն", code: "hy" },
-    { name: "Asturian - asturianu", code: "ast" },
-    { name: "Azerbaijani - azərbaycan dili", code: "az" },
-    { name: "Basque - euskara", code: "eu" },
-    { name: "Belarusian - беларуская", code: "be" },
-    { name: "Bengali - বাংলা", code: "bn" },
-    { name: "Bosnian - bosanski", code: "bs" },
-    { name: "Breton - brezhoneg", code: "br" },
-    { name: "Bulgarian - български", code: "bg" },
-    { name: "Catalan - català", code: "ca" },
-    { name: "Central Kurdish - کوردی (دەستنوسی عەرەبی)", code: "ckb" },
-    { name: "Chinese - 中文", code: "zh" },
-    { name: "Chinese (Hong Kong) - 中文（香港）", code: "zh-HK" },
-    { name: "Chinese (Simplified) - 中文（简体）", code: "zh-CN" },
-    { name: "Chinese (Traditional) - 中文（繁體）", code: "zh-TW" },
-    { name: "Corsican", code: "co" },
-    { name: "Croatian - hrvatski", code: "hr" },
-    { name: "Czech - čeština", code: "cs" },
-    { name: "Danish - dansk", code: "da" },
-    { name: "Dutch - Nederlands", code: "nl" },
-    { name: "English", code: "en" },
-    { name: "English (Australia)", code: "en-AU" },
-    { name: "English (Canada)", code: "en-CA" },
-    { name: "English (India)", code: "en-IN" },
-    { name: "English (New Zealand)", code: "en-NZ" },
-    { name: "English (South Africa)", code: "en-ZA" },
-    { name: "English (United Kingdom)", code: "en-GB" },
-    { name: "English (United States)", code: "en-US" },
-    { name: "Esperanto - esperanto", code: "eo" },
-    { name: "Estonian - eesti", code: "et" },
-    { name: "Faroese - føroyskt", code: "fo" },
-    { name: "Filipino", code: "fil" },
-    { name: "Finnish - suomi", code: "fi" },
-    { name: "French - français", code: "fr" },
-    { name: "French (Canada) - français (Canada)", code: "fr-CA" },
-    { name: "French (France) - français (France)", code: "fr-FR" },
-    { name: "French (Switzerland) - français (Suisse)", code: "fr-CH" },
-    { name: "Galician - galego", code: "gl" },
-    { name: "Georgian - ქართული", code: "ka" },
-    { name: "German - Deutsch", code: "de" },
-    { name: "German (Austria) - Deutsch (Österreich)", code: "de-AT" },
-    { name: "German (Germany) - Deutsch (Deutschland)", code: "de-DE" },
-    { name: "German (Liechtenstein) - Deutsch (Liechtenstein)", code: "de-LI" },
-    { name: "German (Switzerland) - Deutsch (Schweiz)", code: "de-CH" },
-    { name: "Greek - Ελληνικά", code: "el" },
-    { name: "Guarani", code: "gn" },
-    { name: "Gujarati - ગુજરાતી", code: "gu" },
-    { name: "Hausa", code: "ha" },
-    { name: "Hawaiian - ʻŌlelo Hawaiʻi", code: "haw" },
-    { name: "Hebrew - עברית", code: "he" },
-    { name: "Hindi - हिन्दी", code: "hi" },
-    { name: "Hungarian - magyar", code: "hu" },
-    { name: "Icelandic - íslenska", code: "is" },
-    { name: "Indonesian - Indonesia", code: "id" },
-    { name: "Interlingua", code: "ia" },
-    { name: "Irish - Gaeilge", code: "ga" },
-    { name: "Italian - italiano", code: "it" },
-    { name: "Italian (Italy) - italiano (Italia)", code: "it-IT" },
-    { name: "Italian (Switzerland) - italiano (Svizzera)", code: "it-CH" },
-    { name: "Japanese - 日本語", code: "ja" },
-    { name: "Kannada - ಕನ್ನಡ", code: "kn" },
-    { name: "Kazakh - қазақ тілі", code: "kk" },
-    { name: "Khmer - ខ្មែរ", code: "km" },
-    { name: "Korean - 한국어", code: "ko" },
-    { name: "Kurdish - Kurdî", code: "ku" },
-    { name: "Kyrgyz - кыргызча", code: "ky" },
-    { name: "Lao - ລາວ", code: "lo" },
-    { name: "Latin", code: "la" },
-    { name: "Latvian - latviešu", code: "lv" },
-    { name: "Lingala - lingála", code: "ln" },
-    { name: "Lithuanian - lietuvių", code: "lt" },
-    { name: "Macedonian - македонски", code: "mk" },
-    { name: "Malay - Bahasa Melayu", code: "ms" },
-    { name: "Malayalam - മലയാളം", code: "ml" },
-    { name: "Maltese - Malti", code: "mt" },
-    { name: "Marathi - मराठी", code: "mr" },
-    { name: "Mongolian - монгол", code: "mn" },
-    { name: "Nepali - नेपाली", code: "ne" },
-    { name: "Norwegian - norsk", code: "no" },
-    { name: "Norwegian Bokmål - norsk bokmål", code: "nb" },
-    { name: "Norwegian Nynorsk - nynorsk", code: "nn" },
-    { name: "Occitan", code: "oc" },
-    { name: "Oriya - ଓଡ଼ିଆ", code: "or" },
-    { name: "Oromo - Oromoo", code: "om" },
-    { name: "Pashto - پښتو", code: "ps" },
-    { name: "Persian - فارسی", code: "fa" },
-    { name: "Polish - polski", code: "pl" },
-    { name: "Portuguese - português", code: "pt" },
-    { name: "Portuguese (Brazil) - português (Brasil)", code: "pt-BR" },
-    { name: "Portuguese (Portugal) - português (Portugal)", code: "pt-PT" },
-    { name: "Punjabi - ਪੰਜਾਬੀ", code: "pa" },
-    { name: "Quechua", code: "qu" },
-    { name: "Romanian - română", code: "ro" },
-    { name: "Romanian (Moldova) - română (Moldova)", code: "mo" },
-    { name: "Romansh - rumantsch", code: "rm" },
-    { name: "Russian - русский", code: "ru" },
-    { name: "Scottish Gaelic", code: "gd" },
-    { name: "Serbian - српски", code: "sr" },
-    { name: "Serbo - Croatian", code: "sh" },
-    { name: "Shona - chiShona", code: "sn" },
-    { name: "Sindhi", code: "sd" },
-    { name: "Sinhala - සිංහල", code: "si" },
-    { name: "Slovak - slovenčina", code: "sk" },
-    { name: "Slovenian - slovenščina", code: "sl" },
-    { name: "Somali - Soomaali", code: "so" },
-    { name: "Southern Sotho", code: "st" },
-    { name: "Spanish - español", code: "es" },
-    { name: "Spanish (Argentina) - español (Argentina)", code: "es-AR" },
-    {
-      name: "Spanish (Latin America) - español (Latinoamérica)",
-      code: "es-419",
-    },
-    { name: "Spanish (Mexico) - español (México)", code: "es-MX" },
-    { name: "Spanish (Spain) - español (España)", code: "es-ES" },
-    {
-      name: "Spanish (United States) - español (Estados Unidos)",
-      code: "es-US",
-    },
-    { name: "Sundanese", code: "su" },
-    { name: "Swahili - Kiswahili", code: "sw" },
-    { name: "Swedish - svenska", code: "sv" },
-    { name: "Tajik - тоҷикӣ", code: "tg" },
-    { name: "Tamil - தமிழ்", code: "ta" },
-    { name: "Tatar", code: "tt" },
-    { name: "Telugu - తెలుగు", code: "te" },
-    { name: "Thai - ไทย", code: "th" },
-    { name: "Tigrinya - ትግርኛ", code: "ti" },
-    { name: "Tongan - lea fakatonga", code: "to" },
-    { name: "Turkish - Türkçe", code: "tr" },
-    { name: "Turkmen", code: "tk" },
-    { name: "Twi", code: "tw" },
-    { name: "Ukrainian - українська", code: "uk" },
-    { name: "Urdu - اردو", code: "ur" },
-    { name: "Uyghur", code: "ug" },
-    { name: "Uzbek - o‘zbek", code: "uz" },
-    { name: "Vietnamese - Tiếng Việt", code: "vi" },
-    { name: "Walloon - wa", code: "wa" },
-    { name: "Welsh - Cymraeg", code: "cy" },
-    { name: "Western Frisian", code: "fy" },
-    { name: "Xhosa", code: "xh" },
-    { name: "Yiddish", code: "yi" },
-    { name: "Yoruba - Èdè Yorùbá", code: "yo" },
-    { name: "Zulu - isiZulu", code: "zu" },
+    { name: "Hindi", code: "hi-IN" },
+    { name: "Telugu", code: "te-IN" },
+    { name: "Punjabi", code: "pa-IN" },
+    { name: "Tamil", code: "ta-IN" },
+    { name: "Kannada", code: "kn-IN" },
+    { name: "Bengali", code: "bn-IN" },
+    { name: "Gujarati", code: "gu-IN" },
+    { name: "Marathi", code: "mr-IN" },
+    { name: "Malayalam", code: "ml-IN" },
+    { name: "Odia", code: "od-IN" },
   ];
-  const [selectedLanguage, setSelectedLanguage] = useState({ name: "", code: "" });
-  const [IsselectedLanguage, setIsSelectedLanguage] = useState({ name: "", code: "" });
+  const [selectedLanguage, setSelectedLanguage] = useState({
+    name: "",
+    code: "",
+  });
+  const [IsselectedLanguage, setIsSelectedLanguage] = useState({
+    name: "",
+    code: "",
+  });
 
   const [isClicked, setIsClicked] = useState(false);
   const [Clicked, setClicked] = useState(false);
@@ -264,7 +325,7 @@ export default function ConvoScreen() {
     }
   };
   return (
-    <View>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText}>Conversation</Text>
         <Image
@@ -273,29 +334,59 @@ export default function ConvoScreen() {
           onPress={() => alert("list pressed!")}
         />
       </View>
-
+      {/* Lower box  */}
       <View style={styles.content}>
         <View style={styles.box}>
           <View>
             <Text style={{ bottom: 50, right: 100, fontSize: 15 }}>
-              {selectedLanguage.name}
+              {IsselectedLanguage.name}
             </Text>
           </View>
 
-          <TouchableOpacity onPress={() => alert("Replay pressed!")}>
+          <TouchableOpacity
+            onPress={async () => {
+              alert("Replay pressed!");
+              await playBase64Audio(base64String);
+            }}
+          >
             <Image
               source={require("./Group.png")}
               style={{ bottom: 80, right: 20 }}
             />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.mic} onPress={translateAndSpeak}>
+          <TouchableOpacity
+            style={[styles.mic, isProcessing && styles.disabledMic]}
+            disabled={isProcessing}
+            onPress={() => {
+              setTranscript("");
+              setTranslatedText("");
+              setIsUp(false);
+              handleRecordingProcess();
+            }}
+          >
             <Image source={require("./monogram.png")} />
           </TouchableOpacity>
-          {isPlaying ? (
+          {/*isPlaying ? (
             <TouchableOpacity style={styles.mic} onPress={stopBase64Audio}>
               <Image source={require("./monogram.png")} />
             </TouchableOpacity>
-          ) : undefined}
+          ) : undefined*/}
+          <View style={styles.transcriptContainer}>
+            <Text style={styles.transcriptText}>
+              {!isUp
+                ? transcript || "Speak to see transcription"
+                : "Speak to see transcription"}
+              {isUp
+                ? translatedText && (
+                    <View style={styles.translatedTextContainer}>
+                      <Text style={styles.translatedTextStyle}>
+                        {translatedText}
+                      </Text>
+                    </View>
+                  )
+                : undefined}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -307,7 +398,9 @@ export default function ConvoScreen() {
           }}
         >
           <Text style={{ fontWeight: "600" }}>
-            {selectedLanguage.name === "" ? "Select Language" : selectedLanguage.name}
+            {selectedLanguage.name === ""
+              ? "Select Language"
+              : selectedLanguage.name}
           </Text>
           {isClicked ? (
             <Image source={require("./upload.png")} style={styles.Image} />
@@ -320,14 +413,14 @@ export default function ConvoScreen() {
             style={{
               elevation: 5,
               marginTop: 5,
-              position: "relative",
-              top: 300,
-              right: 160,
-              marginRight: 100,
-              height: 300,
+              maxHeight: 300, // Changed from fixed height
               width: "40%",
               backgroundColor: "#fff",
               borderRadius: 10,
+              zIndex: 1000,
+              alignSelf: 'flex-start',
+              marginLeft: 20,
+              
             }}
           >
             <TextInput
@@ -339,39 +432,45 @@ export default function ConvoScreen() {
                 setSearch(txt);
               }}
               style={{
-                width: "100%",
+                width: "90%",
                 height: 40,
+                margin: 10,
                 borderWidth: 0.2,
-                borderColor: "#8e8e8e",
                 borderRadius: 7,
-                marginTop: 10,
-                paddingLeft: 20,
-                marginBottom: 10,
+                paddingLeft: 10
               }}
             />
 
             <FlatList
               data={data}
-              renderItem={({ item, index }) => {
-                return (
-                  <TouchableOpacity
-                    style={{
-                      width: "100%",
-                      height: 40,
-                      borderBottomWidth: 0.5,
-                      borderColor: "#8e8e8e",
-                    }}
-                    onPress={() => {
-                      setSelectedLanguage({ name: item.name, code: item.code });
-                      setIsClicked(!isClicked);
-                      onSearch("");
-                      setSearch("");
-                    }}
-                  >
-                    <Text style={{ fontWeight: "600" }}>{item.name}</Text>
-                  </TouchableOpacity>
-                );
+              showsVerticalScrollIndicator={true}
+              scrollEnabled={true}
+              style={{
+                maxHeight: 240 // Leave room for TextInput
               }}
+              contentContainerStyle={{
+                paddingBottom: 10
+              }}
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({item}) => (
+                <TouchableOpacity
+                  style={{
+                    width: "100%",
+                    minHeight: 40,
+                    borderBottomWidth: 0.5,
+                    borderColor: "#8e8e8e",
+                    padding: 10
+                  }}
+                  onPress={() => {
+                    setSelectedLanguage({ name: item.name, code: item.code });
+                    setIsClicked(!isClicked);
+                    onSearch("");
+                    setSearch("");
+                  }}
+                >
+                  <Text style={{ fontWeight: "600" }}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
             />
           </View>
         ) : null}
@@ -390,7 +489,9 @@ export default function ConvoScreen() {
           }}
         >
           <Text style={{ fontWeight: "600" }}>
-            {IsselectedLanguage.name === "" ? "Select Language" : IsselectedLanguage.name}
+            {IsselectedLanguage.name === ""
+              ? "Select Language"
+              : IsselectedLanguage.name}
           </Text>
           {Clicked ? (
             <Image source={require("./upload.png")} style={styles.Image} />
@@ -443,7 +544,10 @@ export default function ConvoScreen() {
                       borderColor: "#8e8e8e",
                     }}
                     onPress={() => {
-                      setIsSelectedLanguage({ name: item.name, code: item.code });
+                      setIsSelectedLanguage({
+                        name: item.name,
+                        code: item.code,
+                      });
                       setClicked(!Clicked);
                       onSearch("");
                       setSearch("");
@@ -457,28 +561,61 @@ export default function ConvoScreen() {
           </View>
         ) : null}
       </View>
-
+      {/* Upper box  */}
       <View style={styles.content_2}>
         <View style={styles.box_2}>
           <View>
             <Text style={{ bottom: 50, right: 100, fontSize: 15 }}>
-              {IsselectedLanguage.name}
+              {selectedLanguage.name}
             </Text>
           </View>
-          <TouchableOpacity onPress={async ()=>{await playBase64Audio(base64String);}}>
+          <TouchableOpacity
+            onPress={async () => {
+              console.log("upper Replay pressed!");
+              await playBase64Audio(base64String);
+            }}
+          >
             <Image
               source={require("./Group.png")}
               style={{ bottom: 80, right: 20 }}
             />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => alert("Mic pressed!")}
-            style={styles.mic}
+            onPress={() => {
+              setTranscript("");
+              setTranslatedText("");
+              setIsUp(true);
+              handleRecordingProcess();
+            }}
+            style={[styles.mic, isProcessing && styles.disabledMic]}
+            disabled={isProcessing}
           >
             <Image source={require("./monogram.png")} />
+            {isProcessing && <ActivityIndicator size="small" color="#000" />}
           </TouchableOpacity>
+
+          <View style={styles.transcriptContainer}>
+            <Text style={styles.transcriptText}>
+              {isUp
+                ? transcript || "Speak to see transcription"
+                : "Speak to see transcription"}
+              {!isUp
+                ? translatedText && (
+                    <View style={styles.translatedTextContainer}>
+                      <Text style={styles.translatedTextStyle}>
+                        {translatedText}
+                      </Text>
+                    </View>
+                  )
+                : undefined}
+            </Text>
+          </View>
+
+          {error && <Text style={{ color: "red" }}>{error}</Text>}
         </View>
       </View>
+      {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 }
@@ -631,5 +768,41 @@ const styles = StyleSheet.create({
     width: 30,
     right: 50,
     bottom: 20,
+  },
+  errorText: {
+    color: "red",
+    textAlign: "center",
+    marginVertical: 10,
+  },
+  transcriptContainer: {
+    position: "absolute",
+    top: "50%",
+    alignSelf: "center",
+    backgroundColor: "#ffffff",
+    padding: 15,
+    borderRadius: 10,
+    width: "80%",
+    transform: [{ translateY: -30 }],
+  },
+  transcriptText: {
+    fontSize: 18,
+    color: "#333",
+    textAlign: "center",
+  },
+  translatedTextContainer: {
+    position: "absolute",
+    top: 70,
+    width: "80%",
+    padding: 10,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 8,
+  },
+  translatedTextStyle: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+  },
+  disabledMic: {
+    opacity: 0.5,
   },
 });

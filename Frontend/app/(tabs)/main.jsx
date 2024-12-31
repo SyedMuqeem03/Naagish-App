@@ -94,6 +94,12 @@ export default function translation() {
     { name: "Telugu", code: "telugu" },
     { name: "Punjabi", code: "punjabi" },
     { name: "Tamil", code: "tamil" },
+    { name: "Kannada", code: "kn-IN" },
+    { name: "Bengali", code: "bn-IN" },
+    { name: "Gujarati", code: "gu-IN" },
+    { name: "Marathi", code: "mr-IN" },
+    { name: "Malayalam", code: "ml-IN" },
+    { name: "Odia", code: "od-IN" },
   ];
   const [selectedLanguage, setSelectedLanguage] = useState("");
   const [IsselectedLanguage, setIsSelectedLanguage] = useState("");
@@ -134,12 +140,12 @@ export default function translation() {
             value={text}
             onChangeText={(input) => setText(input)}
           />
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.mic}
             onPress={() => alert("Mic pressed!")}
           >
             <Image source={require("./monogram.png")} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         <TouchableOpacity style={styles.button} onPress={translateAndSpeak}>
@@ -159,8 +165,13 @@ export default function translation() {
           <View style={styles.speaker}>
           <Text >{IsselectedLanguage}</Text>
 
-          <Image source={require("../speaker.jpg")} />
-
+             <TouchableOpacity
+                        onPress={async () => {
+                          await playBase64Audio(base64String);
+                        }}
+                      >
+          <Image source={require("../speaker.jpg") }   />
+          </TouchableOpacity>
           </View>
         </View>
       </View>
