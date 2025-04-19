@@ -411,6 +411,7 @@ export default function Convo() {
               <FlatList
                 data={data}
                 showsVerticalScrollIndicator={true}
+                nestedScrollEnabled={true}
                 scrollEnabled={true}
                 style={styles.dropdownList}
                 keyExtractor={(item, index) => index.toString()}
@@ -470,6 +471,8 @@ export default function Convo() {
               <FlatList
                 data={data}
                 style={styles.dropdownList}
+                nestedScrollEnabled={true}
+                scrollEnabled={true}
                 keyExtractor={(item, index) => index.toString()}
                 renderItem={({ item }) => (
                   <TouchableOpacity
@@ -554,13 +557,13 @@ const styles = StyleSheet.create({
   },
   contentBox: {
     width: "100%",
-    minHeight: 220,
+    minHeight: 200,
     backgroundColor: "#F7F2FA",
     borderColor: "black",
     borderWidth: 1.5,
     borderRadius: 30,
     marginVertical: 12,
-    padding: 15,
+    padding: 10,
     position: "relative",
     alignItems: "center",
     justifyContent: "space-between",
@@ -658,12 +661,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
     paddingVertical: 15,
+    position: "relative",
     zIndex: 999, // Ensure dropdowns appear above other content
   },
   dropdownWrapper: {
     flex: 1,
     maxWidth: "45%",
     position: "relative",
+    zIndex: 1000, 
   },
   dropdownSelector: {
     flexDirection: "row",
@@ -702,7 +707,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
-    maxHeight: 300,
+    height:265,
+    // maxHeight: 265,
   },
   searchInput: {
     margin: 10,

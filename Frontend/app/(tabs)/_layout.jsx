@@ -52,7 +52,7 @@ export default function TabLayout() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header Bar */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.menuButton} onPress={toggleMenu}>
@@ -182,7 +182,7 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    paddingTop: Platform.OS === 'android' ? 0 : 0,
   },
   header: {
     backgroundColor: '#007AF5',

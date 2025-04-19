@@ -1,100 +1,148 @@
-// this is translation page
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   TextInput,
-  FlatList,
   ScrollView,
-  SafeAreaView,
-  StatusBar,
   ActivityIndicator,
   Alert,
-  Dimensions
+  Dimensions,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform
 } from "react-native";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Audio } from "expo-av";
-import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
-import { FontAwesome5 } from "@expo/vector-icons";
-import { Redirect } from "expo-router";
-import { useFonts } from "expo-font";
-import { widthScale, heightScale, fontScale, getResponsivePadding } from "../components/ResponsiveUtils";
+import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
+import * as Haptics from 'expo-haptics';
+import { LanguageSelector } from "@/components/ui/LanguageSelector";
+import { Button } from "@/components/ui/Button";
+import { Colors, BorderRadius, Typography, Spacing, Shadows } from "@/constants/Theme";
+import { scale, moderateScale, fontScale } from "@/utils/ResponsiveUtils";
+import * as Clipboard from 'expo-clipboard';
 
-// Get screen dimensions for responsive sizing
-const { width, height } = Dimensions.get('window');
+const languages_list = [
+  { name: "English", code: "en-US" },
+  { name: "Hindi", code: "hi-IN" },
+  { name: "Telugu", code: "te-IN" },
+  { name: "Punjabi", code: "pa-IN" },
+  { name: "Tamil", code: "ta-IN" },
+  { name: "Kannada", code: "kn-IN" },
+  { name: "Bengali", code: "bn-IN" },
+  { name: "Gujarati", code: "gu-IN" },
+  { name: "Marathi", code: "mr-IN" },
+  { name: "Malayalam", code: "ml-IN" },
+  { name: "Odia", code: "od-IN" },
+];
 
-export default function translation() {
-  const [text, setText] = useState("");
-  const [base64String, setBase64String] = useState("");
+export default function Translation() {
+  const [inputText, setInputText] = useState("");
+  const [audioBase64, setAudioBase64] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const sound = new Audio.Sound();
-  const [dimensions, setDimensions] = useState({ width, height });
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [sound, setSound] = useState(null);
+  const [sourceLanguage, setSourceLanguage] = useState({ name: "English", code: "en-US" });
+  const [targetLanguage, setTargetLanguage] = useState({ name: "Hindi", code: "hi-IN" });
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  const inputRef = useRef(null);
+  
+  // Clean up sound when component unmounts
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, [sound]);
 
-  // Handle screen dimension changes
+  // Update dimensions on window resize
   useEffect(() => {
     const subscription = Dimensions.addEventListener(
       'change',
       ({ window }) => {
-        setDimensions({ width: window.width, height: window.height });
+        setDimensions(window);
       }
     );
     return () => subscription.remove();
   }, []);
 
-  const playBase64Audio = async (base64String) => {
+  const playAudio = async (base64String) => {
     try {
-      await sound.unloadAsync();
-      await sound.loadAsync(
-        { uri: `data:audio/mp3;base64,${base64String}` },
-        {},
-        true
-      );
-      await sound.playAsync();
+      if (sound) {
+        await sound.unloadAsync();
+      }
+      
+      const newSound = new Audio.Sound();
+      await newSound.loadAsync({ uri: `data:audio/mp3;base64,${base64String}` });
+      
+      setSound(newSound);
+      setIsPlaying(true);
+      
+      await newSound.playAsync();
+      
+      newSound.setOnPlaybackStatusUpdate((status) => {
+        if (status.didJustFinish) {
+          setIsPlaying(false);
+        }
+      });
+      
+      // Provide haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-      console.error("Error playing sound:", error);
+      console.error("Error playing audio:", error);
+      Alert.alert("Audio Error", "Could not play the audio. Please try again.");
+      setIsPlaying(false);
     }
   };
 
-  const stopBase64Audio = async () => {
+  const stopAudio = async () => {
     try {
-      if (sound._loaded) {
+      if (sound) {
         await sound.stopAsync();
-        await sound.unloadAsync();
-      } else {
-        alert("sound not loaded");
+        setIsPlaying(false);
       }
     } catch (error) {
-      console.error("Error stopping sound:", error);
+      console.error("Error stopping audio:", error);
     }
   };
 
-  const translateAndSpeak = async () => {
-    if (!text.trim()) {
+  const swapLanguages = () => {
+    setSourceLanguage(targetLanguage);
+    setTargetLanguage(sourceLanguage);
+    setInputText(translatedText);
+    setTranslatedText("");
+    setAudioBase64("");
+    
+    // Provide haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const copyToClipboard = async (text) => {
+    await Clipboard.setStringAsync(text);
+    Alert.alert("Copied", "Text copied to clipboard");
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const translateText = async () => {
+    if (!inputText.trim()) {
       Alert.alert("Error", "Please enter text to translate");
       return;
     }
 
-    if (!IsselectedLanguage) {
-      Alert.alert("Error", "Please select a target language");
-      return;
-    }
-
     setIsLoading(true);
-    const apiEndpoint = "https://tts-api-kohl.vercel.app/translate_and_speak";
-    const requestBody = {
-      text: text,
-      language: "hi-IN",
-      target_language:
-        IsselectedLanguage.toLowerCase() === ""
-          ? "hindi"
-          : IsselectedLanguage.toLowerCase(),
-      voice_model: "arvind",
-    };
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
+      const apiEndpoint = "https://tts-api-kohl.vercel.app/translate_and_speak";
+      const requestBody = {
+        text: inputText,
+        language: sourceLanguage.code,
+        target_language: targetLanguage.name.toLowerCase(),
+        voice_model: "arvind", // Default voice model
+      };
+
       const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: {
@@ -104,440 +152,258 @@ export default function translation() {
       });
 
       if (response.ok) {
-        const audioUrl = await response.text();
-        const jsonObject = JSON.parse(audioUrl);
-        setBase64String(jsonObject["audio_data"]);
-        setTranslatedText(jsonObject["translated_text"]);
-        playBase64Audio(jsonObject["audio_data"]);
-        Alert.alert("Success", "Translation and speech processed!");
+        const result = await response.json();
+        setAudioBase64(result.audio_data);
+        setTranslatedText(result.translated_text);
+        
+        // Play audio automatically after translation
+        playAudio(result.audio_data);
+        
+        // Provide success feedback
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
         console.error("API Error:", response.status);
-        Alert.alert("Error", "Failed to process translation and speech.");
+        Alert.alert("Translation Error", "Failed to translate text. Please try again.");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch (error) {
       console.error("Error:", error);
-      Alert.alert("Error", "Something went wrong.");
+      Alert.alert("Network Error", "Please check your internet connection and try again.");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsLoading(false);
     }
   };
-  const handleButtonPress = () => {
-    alert(`Input Value: ${text}`);
-  };
 
-  const languages_list = [
-    { name: "Hindi", code: "hindi" },
-    { name: "Telugu", code: "telugu" },
-    { name: "Punjabi", code: "punjabi" },
-    { name: "Tamil", code: "tamil" },
-    { name: "Kannada", code: "kn-IN" },
-    { name: "Bengali", code: "bn-IN" },
-    { name: "Gujarati", code: "gu-IN" },
-    { name: "Marathi", code: "mr-IN" },
-    { name: "Malayalam", code: "ml-IN" },
-    { name: "Odia", code: "od-IN" },
-  ];
-  const [selectedLanguage, setSelectedLanguage] = useState("");
-  const [IsselectedLanguage, setIsSelectedLanguage] = useState("");
-
-  const [isClicked, setIsClicked] = useState(false);
-  const [Clicked, setClicked] = useState(false);
-
-  const [data, setData] = useState(languages_list);
-  const [search, setSearch] = useState("");
-  const searchRef = useRef();
-  const onSearch = (search) => {
-    if (search !== "") {
-      let tempData = data.filter((item) => {
-        return item.name.toLowerCase().indexOf(search.toLowerCase()) > -1;
-      });
-
-      setData(tempData);
-    } else {
-      setData(languages_list);
-    }
-  };
-
-  // Add dynamic styles for dimension-dependent components
-  const getDynamicStyles = () => {
-    return {
-      contentContainer: {
-        backgroundColor: "#fff",
-        marginHorizontal: widthScale(15),
-        marginTop: heightScale(15),
-        marginBottom: heightScale(15),
-        paddingHorizontal: widthScale(10),
-        paddingVertical: heightScale(15),
-        justifyContent: "space-between",
-        height: heightScale(400),
-      },
-      dropdownArea: {
-        position: "absolute",
-        top: heightScale(150),
-        left: widthScale(20),
-        right: widthScale(20),
-        maxHeight: heightScale(250),
-        borderRadius: widthScale(10),
-        backgroundColor: "#fff",
-        borderWidth: 0.5,
-        borderColor: "#000",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 5,
-        zIndex: 1000,
-      }
-    };
+  const clearInput = () => {
+    setInputText("");
+    inputRef.current?.focus();
   };
 
   return (
-    <View style={styles.container}>
-
-      {/* Language Selection */}
-      <View style={styles.languageSelectionContainer}>
-        <View style={styles.languageSelectorWrapper}>
-          <TouchableOpacity
-            style={styles.languageSelector}
-            onPress={() => {
-              setIsClicked(!isClicked);
-            }}
-          >
-            <Text style={styles.languageSelectorText}>
-              {selectedLanguage == "" ? "English" : selectedLanguage}
-            </Text>
-            <Text style={styles.dashText}>-</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.arrowContainer}>
-          <FontAwesome6
-            name="arrow-right-arrow-left"
-            size={18}
-            color="#007AF5"
-          />
-        </View>
-
-        <View style={styles.languageSelectorWrapper}>
-          <TouchableOpacity
-            style={styles.languageSelector}
-            onPress={() => {
-              setClicked(!Clicked);
-            }}
-          >
-            <Text style={styles.languageSelectorText}>
-              {IsselectedLanguage == "" ? "Hindi" : IsselectedLanguage}
-            </Text>
-            <Text style={styles.dashText}>-</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Language Dropdown */}
-      {isClicked && (
-        <View style={getDynamicStyles().dropdownArea}>
-          <TextInput
-            placeholder="Search languages..."
-            value={search}
-            ref={searchRef}
-            onChangeText={(txt) => {
-              onSearch(txt);
-              setSearch(txt);
-            }}
-            style={styles.searchInput}
-          />
-          <FlatList
-            data={data}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.languageItem}
-                onPress={() => {
-                  setSelectedLanguage(item.name);
-                  setIsClicked(false);
-                  onSearch("");
-                  setSearch("");
-                }}
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidView}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Language Selection */}
+          <View style={styles.languageSelectionContainer}>
+            <View style={styles.languageSelectorRow}>
+              <LanguageSelector
+                selectedLanguage={sourceLanguage}
+                onSelectLanguage={setSourceLanguage}
+                options={languages_list}
+                label="From"
+                style={styles.languageSelector}
+              />
+              
+              <TouchableOpacity 
+                style={styles.swapButton} 
+                onPress={swapLanguages}
+                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
               >
-                <Text style={styles.languageText}>{item.name}</Text>
+                <Ionicons name="swap-horizontal" size={24} color={Colors.primary.light} />
               </TouchableOpacity>
-            )}
-            style={styles.languageList}
-          />
-        </View>
-      )}
+              
+              <LanguageSelector
+                selectedLanguage={targetLanguage}
+                onSelectLanguage={setTargetLanguage}
+                options={languages_list}
+                label="To"
+                style={styles.languageSelector}
+              />
+            </View>
+          </View>
 
-      {Clicked && (
-        <View style={getDynamicStyles().dropdownArea}>
-          <TextInput
-            placeholder="Search languages..."
-            value={search}
-            ref={searchRef}
-            onChangeText={(txt) => {
-              onSearch(txt);
-              setSearch(txt);
-            }}
-            style={styles.searchInput}
-          />
-          <FlatList
-            data={data}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.languageItem}
-                onPress={() => {
-                  setIsSelectedLanguage(item.name);
-                  setClicked(false);
-                  onSearch("");
-                  setSearch("");
-                }}
-              >
-                <Text style={styles.languageText}>{item.name}</Text>
-              </TouchableOpacity>
-            )}
-            style={styles.languageList}
-          />
-        </View>
-      )}
+          {/* Input Section */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>{sourceLanguage.name}</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                ref={inputRef}
+                style={styles.textInput}
+                placeholder={`Enter text in ${sourceLanguage.name}`}
+                placeholderTextColor="#999"
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+              {inputText ? (
+                <TouchableOpacity 
+                  style={styles.clearButton} 
+                  onPress={clearInput}
+                >
+                  <Ionicons name="close-circle" size={22} color={Colors.text.secondary} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
 
-      {/* Main Content Area */}
-      <View style={getDynamicStyles().contentContainer}>
-        {/* Text Input Area */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Enter text here"
-            placeholderTextColor="#888"
-            value={text}
-            onChangeText={(input) => setText(input)}
-            multiline
-            numberOfLines={4}
-          />
-        </View>
+            <View style={styles.actionButtons}>
+              <Button
+                title={isLoading ? "Translating..." : "Translate"}
+                onPress={translateText}
+                loading={isLoading}
+                disabled={isLoading || !inputText.trim()}
+                variant="primary"
+                fullWidth
+                icon={<Ionicons name="language" size={18} color="#fff" />}
+              />
+            </View>
+          </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity style={styles.micButton}>
-            <FontAwesome5 name="microphone" size={22} color="#fff" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.translateButton}
-            onPress={translateAndSpeak}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <Text style={styles.buttonText}>Translate</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Results Section */}
-        <View style={styles.resultContainer}>
+          {/* Output/Result Card */}
           {translatedText ? (
-            <>
-              <View style={styles.resultHeader}>
-                <Text style={styles.resultTitle}>{IsselectedLanguage || "Hindi"}</Text>
-                {base64String ? (
-                  <TouchableOpacity
-                    style={styles.speakerButton}
-                    onPress={async () => {
-                      await playBase64Audio(base64String);
-                    }}
+            <View style={styles.card}>
+              <View style={styles.resultHeaderRow}>
+                <Text style={styles.cardTitle}>{targetLanguage.name}</Text>
+                <View style={styles.resultActions}>
+                  <TouchableOpacity 
+                    style={styles.actionButton} 
+                    onPress={() => copyToClipboard(translatedText)}
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
                   >
-                    <FontAwesome5 name="volume-up" size={16} color="#007AF5" />
+                    <Ionicons name="copy-outline" size={22} color={Colors.primary.light} />
                   </TouchableOpacity>
-                ) : null}
+                  
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.playButton]}
+                    onPress={isPlaying ? stopAudio : () => playAudio(audioBase64)}
+                    disabled={!audioBase64}
+                  >
+                    <Ionicons 
+                      name={isPlaying ? "stop" : "volume-high"} 
+                      size={22} 
+                      color={Colors.primary.light} 
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
+              
               <ScrollView style={styles.translatedTextContainer}>
                 <Text style={styles.translatedText}>{translatedText}</Text>
               </ScrollView>
-            </>
-          ) : (
-            <Text style={styles.placeholderText}>Translation will appear here</Text>
-          )}
-        </View>
-      </View>
-    </View>
+            </View>
+          ) : null}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f8f8",
-    paddingTop: 10,
+    backgroundColor: Colors.background.light,
   },
-  languageSelectionContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: getResponsivePadding(),
-    paddingVertical: heightScale(15),
-    backgroundColor: "#fff",
-  },
-  languageSelectorWrapper: {
+  keyboardAvoidView: {
     flex: 1,
   },
-  languageSelector: {
+  scrollContainer: {
+    flexGrow: 1,
+    paddingVertical: scale(16),
+    paddingHorizontal: scale(16),
+  },
+  languageSelectionContainer: {
+    marginBottom: scale(16),
+  },
+  languageSelectorRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#f5f5f5",
-    paddingVertical: heightScale(8),
-    paddingHorizontal: widthScale(12),
-    borderRadius: widthScale(5),
-    borderWidth: 0.5,
-    borderColor: "#000",
   },
-  languageSelectorText: {
-    color: "#333",
-    fontSize: fontScale(14),
-    fontWeight: "500",
+  languageSelector: {
+    flex: 1,
   },
-  dashText: {
-    color: "#333",
-    fontSize: fontScale(14),
-    fontWeight: "normal",
-  },
-  arrowContainer: {
-    width: widthScale(40),
+  swapButton: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: BorderRadius.round,
+    backgroundColor: Colors.background.accent,
+    justifyContent: "center",
     alignItems: "center",
+    marginHorizontal: scale(8),
+    ...Shadows.light,
   },
-  dropdownArea: {
-    position: "absolute",
-    top: heightScale(150),
-    left: widthScale(20),
-    right: widthScale(20),
-    maxHeight: heightScale(250),
-    borderRadius: widthScale(10),
-    backgroundColor: "#fff",
-    borderWidth: 0.5,
-    borderColor: "#000",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-    zIndex: 1000,
+  card: {
+    backgroundColor: Colors.background.card,
+    borderRadius: BorderRadius.lg,
+    padding: scale(16),
+    marginBottom: scale(16),
+    ...Shadows.light,
   },
-  searchInput: {
-    width: "100%",
-    height: heightScale(40),
-    borderBottomWidth: 1,
-    borderColor: "#e0e0e0",
-    paddingHorizontal: widthScale(15),
-    fontSize: fontScale(14),
-  },
-  languageList: {
-    maxHeight: heightScale(200),
-  },
-  languageItem: {
-    width: "100%",
-    paddingVertical: heightScale(12),
-    paddingHorizontal: widthScale(15),
-    borderBottomWidth: 0.5,
-    borderColor: "#e0e0e0",
-  },
-  languageText: {
-    fontWeight: "500",
-    color: "#333",
-    fontSize: fontScale(14),
-  },
-  contentContainer: {
-    backgroundColor: "#fff",
-    marginHorizontal: widthScale(15),
-    marginTop: heightScale(15),
-    marginBottom: heightScale(15),
-    paddingHorizontal: widthScale(10),
-    paddingVertical: heightScale(15),
-    justifyContent: "space-between",
-    height: heightScale(400),
+  cardTitle: {
+    fontSize: fontScale(Typography.fontSizes.lg),
+    fontWeight: Typography.fontWeights.semiBold,
+    color: Colors.primary.light,
+    marginBottom: scale(12),
   },
   inputContainer: {
-    backgroundColor: "#f5f5f5",
-    borderRadius: widthScale(5),
-    marginBottom: heightScale(15),
-    borderWidth: 0.5,
-    borderColor: "#000",
-    height: heightScale(150),
+    backgroundColor: Colors.background.accent,
+    borderRadius: BorderRadius.md,
+    minHeight: scale(120),
+    maxHeight: scale(200),
+    padding: scale(12),
+    marginBottom: scale(16),
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: Colors.ui.border,
   },
   textInput: {
-    width: "100%",
-    height: "100%",
-    borderRadius: widthScale(5),
-    padding: widthScale(12),
-    fontSize: fontScale(16),
-    textAlignVertical: "top",
-    color: "#333",
-    lineHeight: fontScale(22),
+    fontSize: fontScale(Typography.fontSizes.md),
+    color: Colors.text.primary,
+    lineHeight: scale(22),
+    flex: 1,
   },
-  actionsContainer: {
+  clearButton: {
+    position: 'absolute',
+    top: scale(12),
+    right: scale(12),
+    zIndex: 1,
+  },
+  actionButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  resultHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: heightScale(15),
+    marginBottom: scale(12),
   },
-  micButton: {
-    backgroundColor: "#007AF5",
-    width: widthScale(40),
-    height: widthScale(40),
-    borderRadius: widthScale(20),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  resultContainer: {
-    height: heightScale(150),
-    backgroundColor: "#f5f5f5",
-    borderRadius: widthScale(5),
-    padding: widthScale(12),
-    borderWidth: 0.5,
-    borderColor: "#000",
-    overflow: "scroll",
-  },
-  resultHeader: {
+  resultActions: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: heightScale(8),
   },
-  resultTitle: {
-    fontSize: fontScale(14),
-    fontWeight: "500",
-    color: "#007AF5",
+  actionButton: {
+    padding: scale(8),
+    marginLeft: scale(10),
   },
-  translatedText: {
-    fontSize: fontScale(16),
-    color: "#333",
-    lineHeight: fontScale(22),
-    maxHeight: heightScale(110),
-  },
-  placeholderText: {
-    fontSize: fontScale(14),
-    color: "#999",
-    textAlign: "center",
-    marginTop: heightScale(45),
-  },
-  speakerButton: {
-    padding: widthScale(5),
-  },
-  translateButton: {
-    backgroundColor: "#FF7A00",
-    paddingVertical: heightScale(8),
-    paddingHorizontal: widthScale(16),
-    borderRadius: widthScale(20),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonText: {
-    color: "white",
-    fontSize: fontScale(14),
-    fontWeight: "600",
-    textAlign: "center",
+  playButton: {
+    backgroundColor: Colors.background.accent,
+    borderRadius: BorderRadius.round,
+    width: scale(36),
+    height: scale(36),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   translatedTextContainer: {
-    maxHeight: heightScale(110),
+    backgroundColor: Colors.background.accent,
+    borderRadius: BorderRadius.md,
+    padding: scale(12),
+    maxHeight: scale(200),
+    borderWidth: 1,
+    borderColor: Colors.ui.border,
+  },
+  translatedText: {
+    fontSize: fontScale(Typography.fontSizes.md),
+    color: Colors.text.primary,
+    lineHeight: scale(22),
   },
 });
