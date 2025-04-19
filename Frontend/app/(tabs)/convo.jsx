@@ -9,10 +9,13 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  Dimensions,
+  Platform,
 } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
-// import axios from 'axios';
+
+const { width, height } = Dimensions.get("window");
 
 export default function Convo() {
   const [isUp, setIsUp] = useState(false);
@@ -68,6 +71,34 @@ export default function Convo() {
       console.error("Error stopping sound:", error);
     }
   };
+
+  const languages_list = [
+    { name: "Hindi", code: "hi-IN" },
+    { name: "Telugu", code: "te-IN" },
+    { name: "Punjabi", code: "pa-IN" },
+    { name: "Tamil", code: "ta-IN" },
+    { name: "Kannada", code: "kn-IN" },
+    { name: "Bengali", code: "bn-IN" },
+    { name: "Gujarati", code: "gu-IN" },
+    { name: "Marathi", code: "mr-IN" },
+    { name: "Malayalam", code: "ml-IN" },
+    { name: "Odia", code: "od-IN" },
+  ];
+  const [selectedLanguage, setSelectedLanguage] = useState({
+    name: "",
+    code: "",
+  });
+  const [IsselectedLanguage, setIsSelectedLanguage] = useState({
+    name: "",
+    code: "",
+  });
+
+  const [isClicked, setIsClicked] = useState(false);
+  const [Clicked, setClicked] = useState(false);
+
+  const [data, setData] = useState(languages_list);
+  const [search, setSearch] = useState("");
+  const searchRef = useRef();
 
   const translateAndSpeak = async (transcriptText) => {
     if (!transcriptText) {
@@ -162,12 +193,12 @@ export default function Convo() {
         form.append(
           "language_code",
           !isUp
-            ? IsselectedLanguage["code"] === ""
+            ? IsselectedLanguage.code === ""
               ? "hi-IN"
-              : IsselectedLanguage["code"]
-            : selectedLanguage["code"] === ""
+              : IsselectedLanguage.code
+            : selectedLanguage.code === ""
             ? "hi-IN"
-            : selectedLanguage["code"]
+            : selectedLanguage.code
         );
         form.append("model", "saarika:v1");
 
@@ -231,29 +262,29 @@ export default function Convo() {
           const apiEndpoint =
             "https://tts-api-kohl.vercel.app/translate_and_speak";
           console.log("IsSelected Language:", IsselectedLanguage);
-          console.log("isSelected Language name:", IsselectedLanguage["name"]);
-          console.log("IsSelected Language code:", IsselectedLanguage["code"]);
+          console.log("isSelected Language name:", IsselectedLanguage.name);
+          console.log("IsSelected Language code:", IsselectedLanguage.code);
 
           console.log("Selected Language:", selectedLanguage);
-          console.log("Selected Language name:", selectedLanguage["name"]);
-          console.log("Selected Language code:", selectedLanguage["code"]);
+          console.log("Selected Language name:", selectedLanguage.name);
+          console.log("Selected Language code:", selectedLanguage.code);
 
           const requestBody = {
             text: transcriptionData.transcript,
             language: !isUp
-              ? IsselectedLanguage["code"] === ""
+              ? IsselectedLanguage.code === ""
                 ? "hi-IN"
-                : IsselectedLanguage["code"]
-              : selectedLanguage["code"] === ""
+                : IsselectedLanguage.code
+              : selectedLanguage.code === ""
               ? "hi-IN"
-              : selectedLanguage["code"],
+              : selectedLanguage.code,
             target_language: !isUp
-              ? selectedLanguage["name"].toLowerCase() === ""
+              ? selectedLanguage.name.toLowerCase() === ""
                 ? "telugu"
-                : selectedLanguage["name"].toLowerCase()
-              : IsselectedLanguage["name"].toLowerCase() === ""
+                : selectedLanguage.name.toLowerCase()
+              : IsselectedLanguage.name.toLowerCase() === ""
               ? "telugu"
-              : IsselectedLanguage["name"].toLowerCase(),
+              : IsselectedLanguage.name.toLowerCase(),
             voice_model: "arvind",
           };
 
@@ -270,9 +301,9 @@ export default function Convo() {
           if (response.ok) {
             const audioUrl = await response.text();
             const jsonObject = JSON.parse(audioUrl);
-            setBase64String(jsonObject["audio_data"]);
-            setTranslatedText(jsonObject["translated_text"]);
-            await playBase64Audio(jsonObject["audio_data"]);
+            setBase64String(jsonObject.audio_data);
+            setTranslatedText(jsonObject.translated_text);
+            await playBase64Audio(jsonObject.audio_data);
           }
         }
       } catch (error) {
@@ -287,36 +318,9 @@ export default function Convo() {
     }
   };
 
-  const languages_list = [
-    { name: "Hindi", code: "hi-IN" },
-    { name: "Telugu", code: "te-IN" },
-    { name: "Punjabi", code: "pa-IN" },
-    { name: "Tamil", code: "ta-IN" },
-    { name: "Kannada", code: "kn-IN" },
-    { name: "Bengali", code: "bn-IN" },
-    { name: "Gujarati", code: "gu-IN" },
-    { name: "Marathi", code: "mr-IN" },
-    { name: "Malayalam", code: "ml-IN" },
-    { name: "Odia", code: "od-IN" },
-  ];
-  const [selectedLanguage, setSelectedLanguage] = useState({
-    name: "",
-    code: "",
-  });
-  const [IsselectedLanguage, setIsSelectedLanguage] = useState({
-    name: "",
-    code: "",
-  });
-
-  const [isClicked, setIsClicked] = useState(false);
-  const [Clicked, setClicked] = useState(false);
-
-  const [data, setData] = useState(languages_list);
-  const [search, setSearch] = useState("");
-  const searchRef = useRef();
   const onSearch = (search) => {
     if (search !== "") {
-      let tempData = data.filter((item) => {
+      let tempData = languages_list.filter((item) => {
         return item.name.toLowerCase().indexOf(search.toLowerCase()) > -1;
       });
       setData(tempData);
@@ -324,262 +328,29 @@ export default function Convo() {
       setData(languages_list);
     }
   };
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Conversation</Text>
-        <Image
-          source={require("../list.png")}
-          style={styles.list}
-          onPress={() => alert("list pressed!")}
-        />
-      </View>
-      {/* Lower box  */}
-      <View style={styles.content}>
-        <View style={styles.box}>
-          <View>
-            <Text style={{ bottom: 50, right: 100, fontSize: 15 }}>
-              {IsselectedLanguage.name}
-            </Text>
-          </View>
 
-          <TouchableOpacity
-            onPress={async () => {
-              alert("Replay pressed!");
-              await playBase64Audio(base64String);
-            }}
-          >
-            <Image
-              source={require("./Group.png")}
-              style={{ bottom: 80, right: 20 }}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.mic, isProcessing && styles.disabledMic]}
-            disabled={isProcessing}
-            onPress={() => {
-              setTranscript("");
-              setTranslatedText("");
-              setIsUp(false);
-              handleRecordingProcess();
-            }}
-          >
-            <Image source={require("./monogram.png")} />
-          </TouchableOpacity>
-          {/*isPlaying ? (
-            <TouchableOpacity style={styles.mic} onPress={stopBase64Audio}>
-              <Image source={require("./monogram.png")} />
-            </TouchableOpacity>
-          ) : undefined*/}
-          <View style={styles.transcriptContainer}>
-            <Text style={styles.transcriptText}>
-              {!isUp
-                ? transcript || "Speak to see transcription"
-                : "Speak to see transcription"}
-              {isUp
-                ? translatedText && (
-                    <View style={styles.translatedTextContainer}>
-                      <Text style={styles.translatedTextStyle}>
-                        {translatedText}
-                      </Text>
-                    </View>
-                  )
-                : undefined}
-            </Text>
-          </View>
+      {/* Upper box */}
+      <View style={styles.contentBox}>
+        <View style={styles.languageBox}>
+          <Text style={styles.languageLabel}>
+            {selectedLanguage.name || "Select Language"}
+          </Text>
         </View>
-      </View>
 
-      <View style={styles.dropdowncontainer}>
-        <TouchableOpacity
-          style={styles.dropdownselector}
-          onPress={() => {
-            setIsClicked(!isClicked);
-          }}
-        >
-          <Text style={{ fontWeight: "600" }}>
-            {selectedLanguage.name === ""
-              ? "Select Language"
-              : selectedLanguage.name}
-          </Text>
-          {isClicked ? (
-            <Image source={require("./upload.png")} style={styles.Image} />
-          ) : (
-            <Image source={require("./dropdown.png")} style={styles.Image} />
-          )}
-        </TouchableOpacity>
-        {isClicked ? (
-          <View
-            style={{
-              elevation: 5,
-              marginTop: 5,
-              maxHeight: 300, // Changed from fixed height
-              width: "40%",
-              backgroundColor: "#fff",
-              borderRadius: 10,
-              zIndex: 1000,
-              alignSelf: 'flex-start',
-              marginLeft: 20,
-              
-            }}
-          >
-            <TextInput
-              placeholder="Search.."
-              value={search}
-              ref={searchRef}
-              onChangeText={(txt) => {
-                onSearch(txt);
-                setSearch(txt);
-              }}
-              style={{
-                width: "90%",
-                height: 40,
-                margin: 10,
-                borderWidth: 0.2,
-                borderRadius: 7,
-                paddingLeft: 10
-              }}
-            />
-
-            <FlatList
-              data={data}
-              showsVerticalScrollIndicator={true}
-              scrollEnabled={true}
-              style={{
-                maxHeight: 240 // Leave room for TextInput
-              }}
-              contentContainerStyle={{
-                paddingBottom: 10
-              }}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({item}) => (
-                <TouchableOpacity
-                  style={{
-                    width: "100%",
-                    minHeight: 40,
-                    borderBottomWidth: 0.5,
-                    borderColor: "#8e8e8e",
-                    padding: 10
-                  }}
-                  onPress={() => {
-                    setSelectedLanguage({ name: item.name, code: item.code });
-                    setIsClicked(!isClicked);
-                    onSearch("");
-                    setSearch("");
-                  }}
-                >
-                  <Text style={{ fontWeight: "600" }}>{item.name}</Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        ) : null}
-
-        <FontAwesome6
-          style={styles.Icon}
-          name="arrow-right-arrow-left"
-          size={24}
-          color="black"
-        />
-
-        <TouchableOpacity
-          style={styles.dropdownselector}
-          onPress={() => {
-            setClicked(!Clicked);
-          }}
-        >
-          <Text style={{ fontWeight: "600" }}>
-            {IsselectedLanguage.name === ""
-              ? "Select Language"
-              : IsselectedLanguage.name}
-          </Text>
-          {Clicked ? (
-            <Image source={require("./upload.png")} style={styles.Image} />
-          ) : (
-            <Image source={require("./dropdown.png")} style={styles.Image} />
-          )}
-        </TouchableOpacity>
-        {Clicked ? (
-          <View
-            style={{
-              elevation: 5,
-              marginTop: 5,
-              height: 300,
-              position: "relative",
-              top: 300,
-              right: 155,
-              width: "40%",
-              backgroundColor: "#fff",
-              borderRadius: 10,
-            }}
-          >
-            <TextInput
-              placeholder="Search.."
-              value={search}
-              ref={searchRef}
-              onChangeText={(txt) => {
-                onSearch(txt);
-                setSearch(txt);
-              }}
-              style={{
-                width: "100%",
-                height: 40,
-                borderWidth: 0.2,
-                borderColor: "#8e8e8e",
-                borderRadius: 7,
-                marginTop: 10,
-                paddingLeft: 20,
-                marginBottom: 10,
-              }}
-            />
-            <FlatList
-              data={data}
-              renderItem={({ item, index }) => {
-                return (
-                  <TouchableOpacity
-                    style={{
-                      width: "100%",
-                      height: 40,
-                      borderBottomWidth: 0.5,
-                      borderColor: "#8e8e8e",
-                    }}
-                    onPress={() => {
-                      setIsSelectedLanguage({
-                        name: item.name,
-                        code: item.code,
-                      });
-                      setClicked(!Clicked);
-                      onSearch("");
-                      setSearch("");
-                    }}
-                  >
-                    <Text style={{ fontWeight: "600" }}>{item.name}</Text>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          </View>
-        ) : null}
-      </View>
-      {/* Upper box  */}
-      <View style={styles.content_2}>
-        <View style={styles.box_2}>
-          <View>
-            <Text style={{ bottom: 50, right: 100, fontSize: 15 }}>
-              {selectedLanguage.name}
-            </Text>
-          </View>
+        <View style={styles.translationBox}>
           <TouchableOpacity
+            style={styles.replayButton}
             onPress={async () => {
               console.log("upper Replay pressed!");
               await playBase64Audio(base64String);
             }}
           >
-            <Image
-              source={require("./Group.png")}
-              style={{ bottom: 80, right: 20 }}
-            />
+            <Image source={require("./Group.png")} style={styles.replayIcon} />
           </TouchableOpacity>
+
           <TouchableOpacity
             onPress={() => {
               setTranscript("");
@@ -590,30 +361,184 @@ export default function Convo() {
             style={[styles.mic, isProcessing && styles.disabledMic]}
             disabled={isProcessing}
           >
-            <Image source={require("./monogram.png")} />
+            <Image source={require("./monogram.png")} style={styles.micIcon} />
             {isProcessing && <ActivityIndicator size="small" color="#000" />}
           </TouchableOpacity>
 
           <View style={styles.transcriptContainer}>
             <Text style={styles.transcriptText}>
-              {isUp
-                ? transcript || "Speak to see transcription"
-                : "Speak to see transcription"}
-              {!isUp
-                ? translatedText && (
-                    <View style={styles.translatedTextContainer}>
-                      <Text style={styles.translatedTextStyle}>
-                        {translatedText}
-                      </Text>
-                    </View>
-                  )
-                : undefined}
+              {isUp ? transcript || "Speak to see transcription" : "Speak to see transcription"}
             </Text>
+            {!isUp && translatedText ? (
+              <View style={styles.translatedTextContainer}>
+                <Text style={styles.translatedTextStyle}>{translatedText}</Text>
+              </View>
+            ) : null}
           </View>
-
-          {error && <Text style={{ color: "red" }}>{error}</Text>}
         </View>
       </View>
+
+      {/* Language Selector */}
+      <View style={styles.languageSelectorContainer}>
+        {/* First Language Dropdown */}
+        <View style={styles.dropdownWrapper}>
+          <TouchableOpacity
+            style={styles.dropdownSelector}
+            onPress={() => setIsClicked(!isClicked)}
+          >
+            <Text style={styles.selectorText}>
+              {selectedLanguage.name === "" ? "Select Language" : selectedLanguage.name}
+            </Text>
+            <Image
+              source={isClicked ? require("./upload.png") : require("./dropdown.png")}
+              style={styles.dropdownIcon}
+            />
+          </TouchableOpacity>
+
+          {isClicked && (
+            <View style={styles.dropdown}>
+              <TextInput
+                placeholder="Search.."
+                value={search}
+                ref={searchRef}
+                onChangeText={(txt) => {
+                  onSearch(txt);
+                  setSearch(txt);
+                }}
+                style={styles.searchInput}
+              />
+
+              <FlatList
+                data={data}
+                showsVerticalScrollIndicator={true}
+                scrollEnabled={true}
+                style={styles.dropdownList}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({item}) => (
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setSelectedLanguage({ name: item.name, code: item.code });
+                      setIsClicked(false);
+                      onSearch("");
+                      setSearch("");
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>{item.name}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          )}
+        </View>
+
+        <FontAwesome6
+          style={styles.switchIcon}
+          name="arrow-right-arrow-left"
+          size={24}
+          color="black"
+        />
+
+        {/* Second Language Dropdown */}
+        <View style={styles.dropdownWrapper}>
+          <TouchableOpacity
+            style={styles.dropdownSelector}
+            onPress={() => setClicked(!Clicked)}
+          >
+            <Text style={styles.selectorText}>
+              {IsselectedLanguage.name === "" ? "Select Language" : IsselectedLanguage.name}
+            </Text>
+            <Image
+              source={Clicked ? require("./upload.png") : require("./dropdown.png")}
+              style={styles.dropdownIcon}
+            />
+          </TouchableOpacity>
+
+          {Clicked && (
+            <View style={styles.dropdown}>
+              <TextInput
+                placeholder="Search.."
+                value={search}
+                ref={searchRef}
+                onChangeText={(txt) => {
+                  onSearch(txt);
+                  setSearch(txt);
+                }}
+                style={styles.searchInput}
+              />
+
+              <FlatList
+                data={data}
+                style={styles.dropdownList}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setIsSelectedLanguage({
+                        name: item.name,
+                        code: item.code,
+                      });
+                      setClicked(false);
+                      onSearch("");
+                      setSearch("");
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>{item.name}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* Lower box */}
+      <View style={styles.contentBox}>
+        <View style={styles.languageBox}>
+          <Text style={styles.languageLabel}>
+            {IsselectedLanguage.name || "Select Language"}
+          </Text>
+        </View>
+
+        <View style={styles.translationBox}>
+          <TouchableOpacity
+            style={styles.replayButton}
+            onPress={async () => {
+              alert("Replay pressed!");
+              await playBase64Audio(base64String);
+            }}
+          >
+            <Image source={require("./Group.png")} style={styles.replayIcon} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.mic, isProcessing && styles.disabledMic]}
+            disabled={isProcessing}
+            onPress={() => {
+              setTranscript("");
+              setTranslatedText("");
+              setIsUp(false);
+              handleRecordingProcess();
+            }}
+          >
+            <Image source={require("./monogram.png")} style={styles.micIcon} />
+            {isProcessing && <ActivityIndicator size="small" color="#000" />}
+          </TouchableOpacity>
+
+          <View style={styles.transcriptContainer}>
+            <Text style={styles.transcriptText}>
+              {!isUp ? transcript || "Speak to see transcription" : "Speak to see transcription"}
+            </Text>
+            {isUp && translatedText ? (
+              <View style={styles.translatedTextContainer}>
+                <Text style={styles.translatedTextStyle}>{translatedText}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </View>
+
       {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
@@ -622,187 +547,198 @@ export default function Convo() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 0,
-    justifyContent: "space-between",
-    padding: 10,
+    flex: 1,
     backgroundColor: "#f9f9f9",
+    paddingHorizontal: "5%",
+    paddingTop: 20,
   },
-  header: {
-    backgroundColor: "#007AF5",
-    paddingTop: 30,
-    borderBottomLeftRadius: 15,
-    borderBottomRightRadius: 15,
-    height: 90,
-    justifyContent: "center",
-    paddingLeft: 70,
+  contentBox: {
     width: "100%",
-  },
-
-  headerText: {
-    color: "#fff",
-    fontSize: 30,
-    fontWeight: "bold",
-    top: 15,
-    right: 10,
-  },
-  content_2: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-    top: 320,
-    transform: [{ rotate: "180deg" }],
-  },
-  box_2: {
-    width: "95%",
-    height: 250,
+    minHeight: 220,
     backgroundColor: "#F7F2FA",
     borderColor: "black",
-    borderWidth: 2,
-    borderRadius: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
+    borderWidth: 1.5,
+    borderRadius: 30,
+    marginVertical: 12,
+    padding: 15,
     position: "relative",
-    top: 530,
-  },
-
-  content: {
-    flex: 1,
-    justifyContent: "center",
     alignItems: "center",
-    position: "relative",
-    top: 320,
-    marginTop: 50,
-  },
-  box: {
-    width: "95%",
-    height: 250,
-    backgroundColor: "#F7F2FA",
-    borderColor: "black",
-    borderWidth: 2,
-    borderRadius: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-    position: "relative",
-    top: 160,
-  },
-  label_input: {
-    width: "100%",
-    fontSize: 20,
-    height: 160,
-    backgroundColor: "white",
-    borderRadius: 40,
-    paddingBottom: 60,
-    paddingLeft: 50,
-  },
-  boxText: {
-    color: "#000",
-    fontSize: 18,
-  },
-
-  item: {
-    backgroundColor: "#fff",
-    padding: 20,
-    marginVertical: 8,
-    marginHorizontal: 16,
-    borderRadius: 20,
-    elevation: 1,
-  },
-  title: {
-    fontSize: 24,
-  },
-  dropdownselector: {
-    paddingTop: 6,
-    width: "45%",
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 3,
-    borderColor: "#8e8e8e",
-    marginTop: 260,
-    flexDirection: "row",
-    justifyContent: "space-evenly",
-  },
-  Image: {
-    width: 15,
-    height: 10,
-    paddingTop: 25,
-  },
-  dropdownArea: {
-    width: "40%",
-    height: 300,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    elevation: 5,
-  },
-  dropdowncontainer: {
-    flexDirection: "row",
     justifyContent: "space-between",
-    marginHorizontal: 10,
-    padding: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  Icon: {
-    paddingTop: 270,
+  languageBox: {
+    alignSelf: "flex-start",
+    marginBottom: 10,
+    paddingHorizontal: 15,
   },
-
-  mic: {
-    top: 30,
+  languageLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
   },
-  button: {
-    backgroundColor: "#FF6600",
-    padding: 5,
-    borderRadius: 40,
-    height: 50,
-    width: 140,
-    bottom: 5,
-    left: 100,
+  translationBox: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    paddingVertical: 10,
   },
-  buttonText: {
-    color: "white",
-    fontSize: 23,
-    left: 20,
+  replayButton: {
+    position: "absolute",
+    top: 0,
+    right: 10,
+    zIndex: 2,
+    padding: 8,
   },
-  list: {
-    height: 30,
+  replayIcon: {
     width: 30,
-    right: 50,
-    bottom: 20,
+    height: 30,
+    resizeMode: "contain",
   },
-  errorText: {
-    color: "red",
-    textAlign: "center",
-    marginVertical: 10,
+  mic: {
+    backgroundColor: "#fff",
+    padding: 15,
+    borderRadius: 50,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+    marginVertical: 15,
+  },
+  micIcon: {
+    width: 40,
+    height: 40,
+    resizeMode: "contain",
+  },
+  disabledMic: {
+    opacity: 0.5,
   },
   transcriptContainer: {
-    position: "absolute",
-    top: "50%",
-    alignSelf: "center",
+    width: "90%",
+    minHeight: 80,
     backgroundColor: "#ffffff",
     padding: 15,
-    borderRadius: 10,
-    width: "80%",
-    transform: [{ translateY: -30 }],
+    borderRadius: 15,
+    marginTop: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   transcriptText: {
-    fontSize: 18,
+    fontSize: 16,
     color: "#333",
     textAlign: "center",
+    lineHeight: 22,
   },
   translatedTextContainer: {
-    position: "absolute",
-    top: 70,
-    width: "80%",
-    padding: 10,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    borderRadius: 8,
+    width: "100%",
+    padding: 12,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    borderRadius: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
   },
   translatedTextStyle: {
     fontSize: 16,
     color: "#333",
     textAlign: "center",
+    lineHeight: 22,
   },
-  disabledMic: {
-    opacity: 0.5,
+  languageSelectorContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    paddingVertical: 15,
+    zIndex: 999, // Ensure dropdowns appear above other content
   },
+  dropdownWrapper: {
+    flex: 1,
+    maxWidth: "45%",
+    position: "relative",
+  },
+  dropdownSelector: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#8e8e8e",
+    height: 48,
+  },
+  selectorText: {
+    fontWeight: "600",
+    fontSize: 14,
+    flex: 1,
+  },
+  dropdownIcon: {
+    width: 14,
+    height: 8,
+    resizeMode: "contain",
+    marginLeft: 5,
+  },
+  dropdown: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    marginTop: 5,
+    zIndex: 1000,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+    maxHeight: 300,
+  },
+  searchInput: {
+    margin: 10,
+    borderWidth: 0.5,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderColor: "#ddd",
+    backgroundColor: "#f9f9f9",
+  },
+  dropdownList: {
+    maxHeight: 240,
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 0.5,
+    borderColor: "#eee",
+  },
+  dropdownItemText: {
+    fontWeight: "500",
+    fontSize: 14,
+    color: "#333",
+  },
+  switchIcon: {
+    marginHorizontal: 8,
+  },
+  errorText: {
+    color: "red",
+    textAlign: "center",
+    marginTop: 10,
+    fontSize: 14,
+  },
+  list: {
+    height: 28,
+    width: 28,
+    resizeMode: "contain",
+  }
 });

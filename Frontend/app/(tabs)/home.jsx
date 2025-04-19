@@ -1,11 +1,74 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, Modal } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Modal, Dimensions } from 'react-native';
+import { useRouter } from 'expo-router';
+import { widthScale, heightScale, fontScale, getResponsivePadding } from '../components/ResponsiveUtils';
 
-const Home = () => {
-  const navigation = useNavigation();
+// Get screen dimensions for responsive sizing
+const { width, height } = Dimensions.get('window');
+
+const home = () => {
+  const router = useRouter();
   const [isImageExpanded, setIsImageExpanded] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [dimensions, setDimensions] = useState({ width, height });
+
+  // Handle screen dimension changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener(
+      'change',
+      ({ window }) => {
+        setDimensions({ width: window.width, height: window.height });
+      }
+    );
+    return () => subscription.remove();
+  }, []);
+
+  // Dynamic styles based on current dimensions
+  const dynamicStyles = {
+    boxContainer: {
+      flexDirection: 'row', // Always keep boxes side by side
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width: '100%',
+      paddingHorizontal: dimensions.width < 360 ? widthScale(5) : widthScale(10),
+    },
+    box: {
+      backgroundColor: '#fff',
+      padding: dimensions.width < 360 ? widthScale(10) : widthScale(20),
+      borderRadius: widthScale(20),
+      width: dimensions.width < 360 ? widthScale(135) : dimensions.width < 500 ? widthScale(150) : widthScale(155),
+      height: dimensions.width < 360 ? heightScale(170) : heightScale(200),
+      justifyContent: 'flex-end',
+      paddingBottom: heightScale(25),
+      marginHorizontal: widthScale(5),
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.8,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    modalContent: {
+      backgroundColor: '#fff',
+      padding: widthScale(20),
+      borderRadius: widthScale(10),
+      width: dimensions.width > 600 ? '60%' : '80%',
+      alignItems: 'center',
+    },
+    innerBox: {
+      alignItems: 'center',
+    },
+    image: {
+      width: dimensions.width < 360 ? widthScale(80) : widthScale(100),
+      height: dimensions.width < 360 ? widthScale(80) : widthScale(100),
+      marginBottom: heightScale(10),
+      borderRadius: widthScale(40),
+    },
+    boxText: {
+      fontSize: dimensions.width < 360 ? fontScale(14) : fontScale(16),
+      color: '#024CAA',
+      textAlign: 'center',
+    }
+  };
 
   const handleImagePress = () => {
     setIsImageExpanded(true);
@@ -20,18 +83,11 @@ const Home = () => {
   const handleNavigateToSettings = () => {
     setIsModalVisible(false);
     setIsImageExpanded(false);
-    navigation.navigate('settings'); 
+    router.push('/settings');
   };
 
   return (
     <View>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Home</Text>
-        <TouchableOpacity onPress={() => alert('list pressed!')}>
-          <Image source={require('../list.png')} style={styles.list} />
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.container}>
         <TouchableOpacity onPress={handleImagePress}>
           <Image
@@ -44,25 +100,25 @@ const Home = () => {
         <Text style={styles.subTitle}>Ready to translate?</Text>
         <Text style={styles.subTitle}>Communicate seamlessly in any language</Text>
 
-        <View style={styles.boxContainer}>
-          <TouchableOpacity style={styles.box} onPress={() => navigation.navigate('convo')}>
-            <View style={styles.innerBox}>
-              <Image source={require('./chat.png')} style={styles.image} resizeMode="contain" />
-              <Text style={styles.boxText}>Conversation</Text>
+        <View style={dynamicStyles.boxContainer}>
+          <TouchableOpacity style={dynamicStyles.box} onPress={() => router.push('/convo')}>
+            <View style={dynamicStyles.innerBox}>
+              <Image source={require('./chat.png')} style={dynamicStyles.image} resizeMode="contain" />
+              <Text style={dynamicStyles.boxText}>Conversation</Text>
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.box} onPress={() => navigation.navigate('main')}>
-            <View style={styles.innerBox}>
-              <Image source={require('./lang.png')} style={styles.image} resizeMode="contain" />
-              <Text style={styles.boxText}>Language Translation</Text>
+          <TouchableOpacity style={dynamicStyles.box} onPress={() => router.push('/main')}>
+            <View style={dynamicStyles.innerBox}>
+              <Image source={require('./lang.png')} style={dynamicStyles.image} resizeMode="contain" />
+              <Text style={dynamicStyles.boxText}>Language Translation</Text>
             </View>
           </TouchableOpacity>
         </View>
 
         <Modal transparent={true} visible={isModalVisible} animationType="fade">
           <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
+            <View style={dynamicStyles.modalContent}>
               <Text style={styles.modalText}>Go to Settings?</Text>
               <View style={styles.modalButtons}>
                 <TouchableOpacity style={styles.modalButton} onPress={handleNavigateToSettings}>
@@ -85,62 +141,32 @@ const styles = StyleSheet.create({
     flex: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    marginTop:40
+    padding: getResponsivePadding(),
+    marginTop: heightScale(40)
   },
   userImage: {
-    width: 100, 
-    height: 100, 
-    marginBottom: 60,
-    borderRadius: 50, 
+    width: widthScale(100),
+    height: widthScale(100),
+    marginBottom: heightScale(60),
+    borderRadius: widthScale(50),
   },
   expandedImage: {
-    width: 120,  
-    height: 120, 
+    width: widthScale(120),
+    height: widthScale(120),
   },
   title: {
-    fontSize: 34,
+    fontSize: fontScale(34),
     fontWeight: 'bold',
     color: '#EC8305',
-    marginBottom: 40,
+    marginBottom: heightScale(40),
+    textAlign: 'center',
   },
   subTitle: {
-    fontSize: 19,
+    fontSize: fontScale(19),
     color: '#024CAA',
-    marginBottom: 20,
-  },
-  boxContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-  },
-  box: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 20,
-    width: 155,
-    height: 200,
-    justifyContent: 'flex-end',
-    paddingBottom: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 5, 
-  },
-  innerBox: {
-    alignItems: 'center',
-  },
-  image: {
-    width: 100,
-    height: 100,
-    marginBottom: 10,
-    borderRadius: 40,
-  },
-  boxText: {
-    fontSize: 16,
-    color: '#024CAA', 
+    marginBottom: heightScale(20),
     textAlign: 'center',
+    paddingHorizontal: widthScale(10),
   },
   modalContainer: {
     flex: 1,
@@ -148,17 +174,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-    width: '80%',
-    alignItems: 'center',
-  },
   modalText: {
-    fontSize: 20,
+    fontSize: fontScale(20),
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: heightScale(20),
   },
   modalButtons: {
     flexDirection: 'row',
@@ -167,40 +186,15 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     backgroundColor: '#EC8305',
-    padding: 10,
-    borderRadius: 5,
+    padding: widthScale(10),
+    borderRadius: widthScale(5),
     width: '40%',
     alignItems: 'center',
   },
   modalButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: fontScale(16),
   },
-    header: {
-      backgroundColor: '#007AF5',
-      paddingTop: 30,
-      borderBottomLeftRadius: 15,
-      borderBottomRightRadius: 15,
-      height: 90,
-      justifyContent: 'center',
-      paddingLeft: 70,
-      width: '100%',    
-    },
-    headerText: {
-      color: '#fff',
-      fontSize: 30,
-      fontWeight: 'bold',
-      top: 15,
-      right: 10,
-    },
-    list: {
-      height: 30,
-      width: 30,
-      right: 50,
-      bottom: 20,
-    },
-  
-})
+});
 
-export default Home;
-
+export default home;

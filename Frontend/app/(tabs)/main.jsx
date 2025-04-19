@@ -1,3 +1,4 @@
+// this is translation page
 import {
   View,
   Text,
@@ -6,20 +7,42 @@ import {
   Image,
   TextInput,
   FlatList,
+  ScrollView,
+  SafeAreaView,
+  StatusBar,
+  ActivityIndicator,
+  Alert,
+  Dimensions
 } from "react-native";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Audio } from "expo-av";
-import TabLayout from "./_layout";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
-import Input from "@mui/joy/Input";
+import { FontAwesome5 } from "@expo/vector-icons";
 import { Redirect } from "expo-router";
 import { useFonts } from "expo-font";
+import { widthScale, heightScale, fontScale, getResponsivePadding } from "../components/ResponsiveUtils";
+
+// Get screen dimensions for responsive sizing
+const { width, height } = Dimensions.get('window');
 
 export default function translation() {
-  const [text, setText] = useState("Happy Birthday!");
+  const [text, setText] = useState("");
   const [base64String, setBase64String] = useState("");
   const [translatedText, setTranslatedText] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const sound = new Audio.Sound();
+  const [dimensions, setDimensions] = useState({ width, height });
+
+  // Handle screen dimension changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener(
+      'change',
+      ({ window }) => {
+        setDimensions({ width: window.width, height: window.height });
+      }
+    );
+    return () => subscription.remove();
+  }, []);
 
   const playBase64Audio = async (base64String) => {
     try {
@@ -49,6 +72,17 @@ export default function translation() {
   };
 
   const translateAndSpeak = async () => {
+    if (!text.trim()) {
+      Alert.alert("Error", "Please enter text to translate");
+      return;
+    }
+
+    if (!IsselectedLanguage) {
+      Alert.alert("Error", "Please select a target language");
+      return;
+    }
+
+    setIsLoading(true);
     const apiEndpoint = "https://tts-api-kohl.vercel.app/translate_and_speak";
     const requestBody = {
       text: text,
@@ -75,14 +109,16 @@ export default function translation() {
         setBase64String(jsonObject["audio_data"]);
         setTranslatedText(jsonObject["translated_text"]);
         playBase64Audio(jsonObject["audio_data"]);
-        alert("Success", "Translation and speech processed!");
+        Alert.alert("Success", "Translation and speech processed!");
       } else {
         console.error("API Error:", response.status);
-        alert("Error", "Failed to process translation and speech.");
+        Alert.alert("Error", "Failed to process translation and speech.");
       }
     } catch (error) {
       console.error("Error:", error);
-      alert("Error", "Something went wrong.");
+      Alert.alert("Error", "Something went wrong.");
+    } finally {
+      setIsLoading(false);
     }
   };
   const handleButtonPress = () => {
@@ -121,361 +157,387 @@ export default function translation() {
       setData(languages_list);
     }
   };
+
+  // Add dynamic styles for dimension-dependent components
+  const getDynamicStyles = () => {
+    return {
+      contentContainer: {
+        backgroundColor: "#fff",
+        marginHorizontal: widthScale(15),
+        marginTop: heightScale(15),
+        marginBottom: heightScale(15),
+        paddingHorizontal: widthScale(10),
+        paddingVertical: heightScale(15),
+        justifyContent: "space-between",
+        height: heightScale(400),
+      },
+      dropdownArea: {
+        position: "absolute",
+        top: heightScale(150),
+        left: widthScale(20),
+        right: widthScale(20),
+        maxHeight: heightScale(250),
+        borderRadius: widthScale(10),
+        backgroundColor: "#fff",
+        borderWidth: 0.5,
+        borderColor: "#000",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 5,
+        zIndex: 1000,
+      }
+    };
+  };
+
   return (
-    <View>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Language Translator</Text>
-        <Image
-          source={require("../list.png")}
-          style={styles.list}
-          onPress={() => alert("list pressed!")}
-        />
+    <View style={styles.container}>
+
+      {/* Language Selection */}
+      <View style={styles.languageSelectionContainer}>
+        <View style={styles.languageSelectorWrapper}>
+          <TouchableOpacity
+            style={styles.languageSelector}
+            onPress={() => {
+              setIsClicked(!isClicked);
+            }}
+          >
+            <Text style={styles.languageSelectorText}>
+              {selectedLanguage == "" ? "English" : selectedLanguage}
+            </Text>
+            <Text style={styles.dashText}>-</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.arrowContainer}>
+          <FontAwesome6
+            name="arrow-right-arrow-left"
+            size={18}
+            color="#007AF5"
+          />
+        </View>
+
+        <View style={styles.languageSelectorWrapper}>
+          <TouchableOpacity
+            style={styles.languageSelector}
+            onPress={() => {
+              setClicked(!Clicked);
+            }}
+          >
+            <Text style={styles.languageSelectorText}>
+              {IsselectedLanguage == "" ? "Hindi" : IsselectedLanguage}
+            </Text>
+            <Text style={styles.dashText}>-</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.content}>
-        <View style={styles.box}>
+      {/* Language Dropdown */}
+      {isClicked && (
+        <View style={getDynamicStyles().dropdownArea}>
           <TextInput
-            style={styles.label_input}
+            placeholder="Search languages..."
+            value={search}
+            ref={searchRef}
+            onChangeText={(txt) => {
+              onSearch(txt);
+              setSearch(txt);
+            }}
+            style={styles.searchInput}
+          />
+          <FlatList
+            data={data}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.languageItem}
+                onPress={() => {
+                  setSelectedLanguage(item.name);
+                  setIsClicked(false);
+                  onSearch("");
+                  setSearch("");
+                }}
+              >
+                <Text style={styles.languageText}>{item.name}</Text>
+              </TouchableOpacity>
+            )}
+            style={styles.languageList}
+          />
+        </View>
+      )}
+
+      {Clicked && (
+        <View style={getDynamicStyles().dropdownArea}>
+          <TextInput
+            placeholder="Search languages..."
+            value={search}
+            ref={searchRef}
+            onChangeText={(txt) => {
+              onSearch(txt);
+              setSearch(txt);
+            }}
+            style={styles.searchInput}
+          />
+          <FlatList
+            data={data}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.languageItem}
+                onPress={() => {
+                  setIsSelectedLanguage(item.name);
+                  setClicked(false);
+                  onSearch("");
+                  setSearch("");
+                }}
+              >
+                <Text style={styles.languageText}>{item.name}</Text>
+              </TouchableOpacity>
+            )}
+            style={styles.languageList}
+          />
+        </View>
+      )}
+
+      {/* Main Content Area */}
+      <View style={getDynamicStyles().contentContainer}>
+        {/* Text Input Area */}
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
             placeholder="Enter text here"
+            placeholderTextColor="#888"
             value={text}
             onChangeText={(input) => setText(input)}
+            multiline
+            numberOfLines={4}
           />
-          {/* <TouchableOpacity
-            style={styles.mic}
-            onPress={() => alert("Mic pressed!")}
-          >
-            <Image source={require("./monogram.png")} />
-          </TouchableOpacity> */}
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={translateAndSpeak}>
-          <Text style={styles.buttonText}>Translate</Text>
-        </TouchableOpacity>
+        {/* Action Buttons */}
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity style={styles.micButton}>
+            <FontAwesome5 name="microphone" size={22} color="#fff" />
+          </TouchableOpacity>
 
-        <View style={styles.box}>
           <TouchableOpacity
-            // style={styles.speaker}
-            onPress={async () => {
-              await playBase64Audio(base64String);
-            }}
+            style={styles.translateButton}
+            onPress={translateAndSpeak}
+            disabled={isLoading}
           >
-            <Text >{translatedText}</Text>
-
+            {isLoading ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text style={styles.buttonText}>Translate</Text>
+            )}
           </TouchableOpacity>
-          <View style={styles.speaker}>
-          <Text >{IsselectedLanguage}</Text>
+        </View>
 
-             <TouchableOpacity
-                        onPress={async () => {
-                          await playBase64Audio(base64String);
-                        }}
-                      >
-          <Image source={require("../speaker.jpg") }   />
-          </TouchableOpacity>
-          </View>
+        {/* Results Section */}
+        <View style={styles.resultContainer}>
+          {translatedText ? (
+            <>
+              <View style={styles.resultHeader}>
+                <Text style={styles.resultTitle}>{IsselectedLanguage || "Hindi"}</Text>
+                {base64String ? (
+                  <TouchableOpacity
+                    style={styles.speakerButton}
+                    onPress={async () => {
+                      await playBase64Audio(base64String);
+                    }}
+                  >
+                    <FontAwesome5 name="volume-up" size={16} color="#007AF5" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <ScrollView style={styles.translatedTextContainer}>
+                <Text style={styles.translatedText}>{translatedText}</Text>
+              </ScrollView>
+            </>
+          ) : (
+            <Text style={styles.placeholderText}>Translation will appear here</Text>
+          )}
         </View>
       </View>
-      <View style={styles.dropdowncontainer}>
-        <TouchableOpacity
-          style={styles.dropdownselector}
-          onPress={() => {
-            setIsClicked(!isClicked);
-          }}
-        >
-          <Text style={{ fontWeight: "600" }}>
-            {selectedLanguage == "" ? "Select Language" : selectedLanguage}
-          </Text>
-          {isClicked ? (
-            <Image source={require("./upload.png")} style={styles.Image} />
-          ) : (
-            <Image source={require("./dropdown.png")} style={styles.Image} />
-          )}
-        </TouchableOpacity>
-        {isClicked ? (
-          <View
-            style={{
-              elevation: 5,
-              marginTop: 5,
-              position: "relative",
-              top: 50,
-              right: 145,
-              marginRight: 100,
-              height: 300,
-              width: "40%",
-              backgroundColor: "#fff",
-              borderRadius: 10,
-            }}
-          >
-            <TextInput
-              placeholder="Search.."
-              value={search}
-              ref={searchRef}
-              onChangeText={(txt) => {
-                onSearch(txt);
-                setSearch(txt);
-              }}
-              style={{
-                width: "100%",
-                height: 40,
-                borderWidth: 0.2,
-                borderColor: "#8e8e8e",
-                borderRadius: 7,
-                marginTop: 10,
-                paddingLeft: 20,
-                marginBottom: 10,
-              }}
-            />
-
-            <FlatList
-              data={data}
-              renderItem={({ item, index }) => {
-                return (
-                  <TouchableOpacity
-                    style={{
-                      width: "100%",
-                      height: 40,
-                      borderBottomWidth: 0.5,
-                      borderColor: "#8e8e8e",
-                    }}
-                    onPress={() => {
-                      setSelectedLanguage(item.name);
-                      setIsClicked(!isClicked);
-                      onSearch("");
-                      setSearch("");
-                    }}
-                  >
-                    <Text style={{ fontWeight: "600" }}>{item.name}</Text>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          </View>
-        ) : null}
-
-        <FontAwesome6
-          style={styles.Icon}
-          name="arrow-right-arrow-left"
-          size={24}
-          color="black"
-        />
-        <TouchableOpacity
-          style={styles.dropdownselector}
-          onPress={() => {
-            setClicked(!Clicked);
-          }}
-        >
-          <Text style={{ fontWeight: "600" }}>
-            {IsselectedLanguage == "" ? "Select Language" : IsselectedLanguage}
-          </Text>
-          {Clicked ? (
-            <Image source={require("./upload.png")} style={styles.Image} />
-          ) : (
-            <Image source={require("./dropdown.png")} style={styles.Image} />
-          )}
-        </TouchableOpacity>
-        {Clicked ? (
-          <View
-            style={{
-              elevation: 5,
-              marginTop: 5,
-              height: 300,
-              position: "relative",
-              top: 50,
-              right: 145,
-              width: "40%",
-              backgroundColor: "#fff",
-              borderRadius: 10,
-            }}
-          >
-            <TextInput
-              placeholder="Search.."
-              value={search}
-              ref={searchRef}
-              onChangeText={(txt) => {
-                onSearch(txt);
-                setSearch(txt);
-              }}
-              style={{
-                width: "100%",
-                height: 40,
-                borderWidth: 0.2,
-                borderColor: "#8e8e8e",
-                borderRadius: 7,
-                marginTop: 10,
-                paddingLeft: 20,
-                marginBottom: 10,
-              }}
-            />
-            <FlatList
-              data={data}
-              renderItem={({ item, index }) => {
-                return (
-                  <TouchableOpacity
-                    style={{
-                      width: "100%",
-                      height: 40,
-                      borderBottomWidth: 0.5,
-                      borderColor: "#8e8e8e",
-                    }}
-                    onPress={() => {
-                      setIsSelectedLanguage(item.name);
-                      setClicked(!Clicked);
-                      onSearch("");
-                      setSearch("");
-                    }}
-                  >
-                    <Text style={{ fontWeight: "600" }}>{item.name}</Text>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          </View>
-        ) : null}
-      </View>
-
-      <TabLayout />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 0,
-    justifyContent: "space-between",
-    padding: 10,
-    backgroundColor: "#f9f9f9",
-  },
-  header: {
-    backgroundColor: "#007AF5",
-    paddingTop: 30,
-    borderBottomLeftRadius: 15,
-    borderBottomRightRadius: 15,
-    height: 90,
-    justifyContent: "center",
-    paddingLeft: 70,
-    width: "100%",
-  },
-  headerText: {
-    color: "#fff",
-    fontSize: 30,
-    fontWeight: "bold",
-    top: 15,
-    right: 10,
-  },
-  list: {
-    height: 30,
-    width: 30,
-    right: 50,
-    bottom: 20,
-  },
-  content: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-    top: 320,
+    backgroundColor: "#f8f8f8",
+    paddingTop: 10,
   },
-  box: {
-    width: "95%",
-    height: 250,
-    backgroundColor: "#F7F2FA",
-    borderColor: "black",
-    borderWidth: 2,
-    borderRadius: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-    position: "relative",
-    top: 80,
-  },
-  label_input: {
-    width: "100%",
-    fontSize: 20,
-    height: 160,
-    backgroundColor: "F7F2FA",
-    borderRadius: 40,
-    paddingBottom: 60,
-    paddingLeft: 50,
-  },
-  boxText: {
-    color: "#000",
-    fontSize: 18,
-  },
-  item: {
-    backgroundColor: "#fff",
-    padding: 20,
-    marginVertical: 8,
-    marginHorizontal: 16,
-    borderRadius: 20,
-    elevation: 1,
-  },
-  title: {
-    fontSize: 24,
-  },
-  dropdownselector: {
-    paddingTop: 6,
-    width: "45%",
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 3,
-    borderColor: "#8e8e8e",
-    marginTop: 20,
+  languageSelectionContainer: {
     flexDirection: "row",
-    justifyContent: "space-evenly",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: getResponsivePadding(),
+    paddingVertical: heightScale(15),
+    backgroundColor: "#fff",
   },
-  Image: {
-    width: 15,
-    height: 10,
+  languageSelectorWrapper: {
+    flex: 1,
+  },
+  languageSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f5f5f5",
+    paddingVertical: heightScale(8),
+    paddingHorizontal: widthScale(12),
+    borderRadius: widthScale(5),
+    borderWidth: 0.5,
+    borderColor: "#000",
+  },
+  languageSelectorText: {
+    color: "#333",
+    fontSize: fontScale(14),
+    fontWeight: "500",
+  },
+  dashText: {
+    color: "#333",
+    fontSize: fontScale(14),
+    fontWeight: "normal",
+  },
+  arrowContainer: {
+    width: widthScale(40),
+    alignItems: "center",
   },
   dropdownArea: {
-    width: "40%",
-    height: 300,
-    borderRadius: 10,
+    position: "absolute",
+    top: heightScale(150),
+    left: widthScale(20),
+    right: widthScale(20),
+    maxHeight: heightScale(250),
+    borderRadius: widthScale(10),
     backgroundColor: "#fff",
+    borderWidth: 0.5,
+    borderColor: "#000",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 5,
+    zIndex: 1000,
   },
-  dropdowncontainer: {
+  searchInput: {
+    width: "100%",
+    height: heightScale(40),
+    borderBottomWidth: 1,
+    borderColor: "#e0e0e0",
+    paddingHorizontal: widthScale(15),
+    fontSize: fontScale(14),
+  },
+  languageList: {
+    maxHeight: heightScale(200),
+  },
+  languageItem: {
+    width: "100%",
+    paddingVertical: heightScale(12),
+    paddingHorizontal: widthScale(15),
+    borderBottomWidth: 0.5,
+    borderColor: "#e0e0e0",
+  },
+  languageText: {
+    fontWeight: "500",
+    color: "#333",
+    fontSize: fontScale(14),
+  },
+  contentContainer: {
+    backgroundColor: "#fff",
+    marginHorizontal: widthScale(15),
+    marginTop: heightScale(15),
+    marginBottom: heightScale(15),
+    paddingHorizontal: widthScale(10),
+    paddingVertical: heightScale(15),
+    justifyContent: "space-between",
+    height: heightScale(400),
+  },
+  inputContainer: {
+    backgroundColor: "#f5f5f5",
+    borderRadius: widthScale(5),
+    marginBottom: heightScale(15),
+    borderWidth: 0.5,
+    borderColor: "#000",
+    height: heightScale(150),
+  },
+  textInput: {
+    width: "100%",
+    height: "100%",
+    borderRadius: widthScale(5),
+    padding: widthScale(12),
+    fontSize: fontScale(16),
+    textAlignVertical: "top",
+    color: "#333",
+    lineHeight: fontScale(22),
+  },
+  actionsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginHorizontal: 10,
-    paddingTop: 15,
+    alignItems: "center",
+    marginBottom: heightScale(15),
   },
-  Icon: {
-    paddingTop: 25,
+  micButton: {
+    backgroundColor: "#007AF5",
+    width: widthScale(40),
+    height: widthScale(40),
+    borderRadius: widthScale(20),
+    alignItems: "center",
+    justifyContent: "center",
   },
-  mic: {
-    right: 110,
-    bottom: 20,
+  resultContainer: {
+    height: heightScale(150),
+    backgroundColor: "#f5f5f5",
+    borderRadius: widthScale(5),
+    padding: widthScale(12),
+    borderWidth: 0.5,
+    borderColor: "#000",
+    overflow: "scroll",
   },
-  button: {
-    backgroundColor: "#FF6600",
-    padding: 5,
-    borderRadius: 40,
-    height: 50,
-    width: 140,
-    bottom: 5,
-    left: 100,
+  resultHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: heightScale(8),
+  },
+  resultTitle: {
+    fontSize: fontScale(14),
+    fontWeight: "500",
+    color: "#007AF5",
+  },
+  translatedText: {
+    fontSize: fontScale(16),
+    color: "#333",
+    lineHeight: fontScale(22),
+    maxHeight: heightScale(110),
+  },
+  placeholderText: {
+    fontSize: fontScale(14),
+    color: "#999",
+    textAlign: "center",
+    marginTop: heightScale(45),
+  },
+  speakerButton: {
+    padding: widthScale(5),
+  },
+  translateButton: {
+    backgroundColor: "#FF7A00",
+    paddingVertical: heightScale(8),
+    paddingHorizontal: widthScale(16),
+    borderRadius: widthScale(20),
+    alignItems: "center",
+    justifyContent: "center",
   },
   buttonText: {
     color: "white",
-    fontSize: 23,
-    left: 20,
-  },
-  speaker: {
-    bottom: 110,
-    right: 85,
-    // left: 70,
-    flexDirection: "row",
-    gap: 15,
-  },
-  translateText: {
-    fontSize: 16,
-    color: "black",
+    fontSize: fontScale(14),
     fontWeight: "600",
     textAlign: "center",
-    justifyContent: "center",
-    // top: 80,
-    // left: 50,
   },
- 
+  translatedTextContainer: {
+    maxHeight: heightScale(110),
+  },
 });

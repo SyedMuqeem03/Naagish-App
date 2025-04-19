@@ -1,16 +1,22 @@
-import React, { useState } from 'react';
-import { 
-  Text, 
-  View, 
-  Image, 
-  Modal, 
-  FlatList, 
+import React, { useState, useEffect } from 'react';
+import {
+  Text,
+  View,
+  Image,
+  Modal,
+  FlatList,
   TextInput,
-  TouchableOpacity, 
+  TouchableOpacity,
   TouchableWithoutFeedback,
   Keyboard,
-  StyleSheet 
+  StyleSheet,
+  Dimensions
 } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
+import { widthScale, heightScale, fontScale, getResponsivePadding } from '../components/ResponsiveUtils';
+
+// Get screen dimensions for responsive sizing
+const { width, height } = Dimensions.get('window');
 
 export default function Settings() {
   const [visibleRegion, setVisibleRegion] = useState(false);
@@ -22,6 +28,18 @@ export default function Settings() {
   const [username, setUsername] = useState('username');
   const [newUsername, setNewUsername] = useState('');
   const [visibleUsernameModal, setVisibleUsernameModal] = useState(false);
+  const [dimensions, setDimensions] = useState({ width, height });
+
+  // Track dimension changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener(
+      'change',
+      ({ window }) => {
+        setDimensions({ width: window.width, height: window.height });
+      }
+    );
+    return () => subscription.remove();
+  }, []);
 
   const regions = [
     { label: 'North India', value: 'North India' },
@@ -50,214 +68,331 @@ export default function Settings() {
       setVisibleUsernameModal(false);
     }
   };
-  
+
   const handleOutsidePress = () => {
     setVisibleRegion(false);
     setVisibleLanguage(false);
     setVisibleEmail(false);
     setVisibleUsernameModal(false);
-    Keyboard.dismiss(); 
+    Keyboard.dismiss();
+  };
+
+  // Add this function to create dynamic styles
+  const getDynamicModalContent = () => {
+    return {
+      backgroundColor: '#fff',
+      padding: widthScale(20),
+      borderRadius: widthScale(10),
+      width: dimensions.width > 600 ? '70%' : '85%', // Adjust width for tablets
+      maxHeight: dimensions.height > 800 ? '60%' : '70%', // Adjust height based on device
+    };
   };
 
   return (
-    <View style={styles.navcontainer}>
-      <View style={styles.navHeader}>
-        <Text style={styles.navHeaderText}>Settings</Text>
-        <TouchableOpacity onPress={() => alert('list pressed!')}>
-          <Image source={require('../list.png')} style={styles.list}/>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.container}>
-        <TouchableWithoutFeedback onPress={handleOutsidePress}>
-          <View style={styles.innerContainer}>
-            <Image source={require('@/assets/images/manuser.png')} style={styles.image}/>
-            <TouchableOpacity onPress={() => setVisibleUsernameModal(true)}>
+    <View style={styles.container}>
+      <TouchableWithoutFeedback onPress={handleOutsidePress}>
+        <View style={styles.innerContainer}>
+          <View style={styles.profileSection}>
+            <Image source={require('@/assets/images/manuser.png')} style={styles.image} />
+            <TouchableOpacity
+              style={styles.usernameContainer}
+              onPress={() => setVisibleUsernameModal(true)}
+            >
               <Text style={styles.username}>{username}</Text>
+              <FontAwesome name="edit" size={16} color="#007AF5" style={styles.editIcon} />
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.settingsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Account Settings</Text>
+            </View>
 
             <View style={styles.row}>
-              <Text style={styles.heading}>Region:</Text>
-              <TouchableOpacity onPress={() => setVisibleRegion(true)}>
-                <View style={styles.box}>
-                  <Text style={styles.selected}>{selectedRegion}</Text>
-                </View>
+              <Text style={styles.heading}>Region</Text>
+              <TouchableOpacity
+                style={styles.dropdownSelector}
+                onPress={() => setVisibleRegion(true)}
+              >
+                <Text style={styles.selected}>{selectedRegion}</Text>
+                <FontAwesome name="chevron-down" size={14} color="#666" />
               </TouchableOpacity>
-              <Modal visible={visibleRegion} transparent={true}>
-                <TouchableWithoutFeedback onPress={handleOutsidePress}>
-                  <View style={styles.modal}>
-                    <FlatList
-                      data={regions}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity onPress={() => {
+            </View>
+
+            <View style={styles.divider}></View>
+
+            <View style={styles.row}>
+              <Text style={styles.heading}>Language</Text>
+              <TouchableOpacity
+                style={styles.dropdownSelector}
+                onPress={() => setVisibleLanguage(true)}
+              >
+                <Text style={styles.selected}>{selectedLanguage}</Text>
+                <FontAwesome name="chevron-down" size={14} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.divider}></View>
+
+            <View style={styles.row}>
+              <Text style={styles.heading}>Email</Text>
+              <TouchableOpacity
+                style={styles.dropdownSelector}
+                onPress={() => setVisibleEmail(true)}
+              >
+                <Text style={styles.selected}>{selectedEmail}</Text>
+                <FontAwesome name="chevron-down" size={14} color="#666" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Modal for region selection */}
+          <Modal visible={visibleRegion} transparent={true} animationType="fade">
+            <TouchableWithoutFeedback onPress={handleOutsidePress}>
+              <View style={styles.modalContainer}>
+                <View style={[styles.modalContent, getDynamicModalContent()]}>
+                  <Text style={styles.modalTitle}>Select Region</Text>
+                  <FlatList
+                    data={regions}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={[
+                          styles.optionItem,
+                          selectedRegion === item.value && styles.selectedOption
+                        ]}
+                        onPress={() => {
                           setSelectedRegion(item.value);
                           setVisibleRegion(false);
-                        }}>
-                          <Text style={styles.option}>{item.label}</Text>
-                        </TouchableOpacity>
-                      )}
-                      keyExtractor={(item) => item.value}
-                    />
-                    <TouchableOpacity style={styles.closeButton} onPress={() => setVisibleRegion(false)}>
-                      <Text style={styles.closeButtonText}>Close</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableWithoutFeedback>
-              </Modal>
-            </View>
-
-            <View style={styles.row}>
-              <Text style={styles.heading}>Language:</Text>
-              <TouchableOpacity onPress={() => setVisibleLanguage(true)}>
-                <View style={styles.box}>
-                  <Text style={styles.selected}>{selectedLanguage}</Text>
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            selectedRegion === item.value && styles.selectedOptionText
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                        {selectedRegion === item.value && (
+                          <FontAwesome name="check" size={16} color="#007AF5" />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    keyExtractor={(item) => item.value}
+                  />
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => setVisibleRegion(false)}
+                  >
+                    <Text style={styles.closeButtonText}>Close</Text>
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
-              <Modal visible={visibleLanguage} transparent={true}>
-                <TouchableWithoutFeedback onPress={handleOutsidePress}>
-                  <View style={styles.modal}>
-                    <FlatList
-                      data={languages}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity onPress={() => {
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
+
+          {/* Modal for language selection */}
+          <Modal visible={visibleLanguage} transparent={true} animationType="fade">
+            <TouchableWithoutFeedback onPress={handleOutsidePress}>
+              <View style={styles.modalContainer}>
+                <View style={[styles.modalContent, getDynamicModalContent()]}>
+                  <Text style={styles.modalTitle}>Select Language</Text>
+                  <FlatList
+                    data={languages}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={[
+                          styles.optionItem,
+                          selectedLanguage === item.value && styles.selectedOption
+                        ]}
+                        onPress={() => {
                           setSelectedLanguage(item.value);
                           setVisibleLanguage(false);
-                        }}>
-                          <Text style={styles.option}>{item.label}</Text>
-                        </TouchableOpacity>
-                      )}
-                      keyExtractor={(item) => item.value}
-                    />
-                    <TouchableOpacity style={styles.closeButton} onPress={() => setVisibleLanguage(false)}>
-                      <Text style={styles.closeButtonText}>Close</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableWithoutFeedback>
-              </Modal>
-            </View>
-
-            <View style={styles.row}>
-              <Text style={styles.heading}>Email:</Text>
-              <TouchableOpacity onPress={() => setVisibleEmail(true)}>
-                <View style={styles.box}>
-                  <Text style={styles.selected}>{selectedEmail}</Text>
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            selectedLanguage === item.value && styles.selectedOptionText
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                        {selectedLanguage === item.value && (
+                          <FontAwesome name="check" size={16} color="#007AF5" />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    keyExtractor={(item) => item.value}
+                  />
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => setVisibleLanguage(false)}
+                  >
+                    <Text style={styles.closeButtonText}>Close</Text>
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
-              <Modal visible={visibleEmail} transparent={true}>
-                <TouchableWithoutFeedback onPress={handleOutsidePress}>
-                  <View style={styles.modal}>
-                    <FlatList
-                      data={emails}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity onPress={() => {
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
+
+          {/* Modal for email selection */}
+          <Modal visible={visibleEmail} transparent={true} animationType="fade">
+            <TouchableWithoutFeedback onPress={handleOutsidePress}>
+              <View style={styles.modalContainer}>
+                <View style={[styles.modalContent, getDynamicModalContent()]}>
+                  <Text style={styles.modalTitle}>Select Email Type</Text>
+                  <FlatList
+                    data={emails}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={[
+                          styles.optionItem,
+                          selectedEmail === item.value && styles.selectedOption
+                        ]}
+                        onPress={() => {
                           setSelectedEmail(item.value);
                           setVisibleEmail(false);
-                        }}>
-                          <Text style={styles.option}>{item.label}</Text>
-                        </TouchableOpacity>
-                      )}
-                      keyExtractor={(item) => item.value}
-                    />
-                    <TouchableOpacity style={styles.closeButton} onPress={() => setVisibleEmail(false)}>
-                      <Text style={styles.closeButtonText}>Close</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableWithoutFeedback>
-              </Modal>
-            </View>
-
-            <Modal visible={visibleUsernameModal} transparent={true}>
-              <TouchableWithoutFeedback onPress={handleOutsidePress}>
-                <View style={styles.modalContainer}>
-                  <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>Change Username</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter new username"
-                      value={newUsername}
-                      onChangeText={setNewUsername}
-                    />
-                    <TouchableOpacity style={styles.submitButton} onPress={updateUsername}>
-                      <Text style={styles.submitButtonText}>Submit</Text>
-                    </TouchableOpacity>
-                  </View>
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            selectedEmail === item.value && styles.selectedOptionText
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                        {selectedEmail === item.value && (
+                          <FontAwesome name="check" size={16} color="#007AF5" />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    keyExtractor={(item) => item.value}
+                  />
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => setVisibleEmail(false)}
+                  >
+                    <Text style={styles.closeButtonText}>Close</Text>
+                  </TouchableOpacity>
                 </View>
-              </TouchableWithoutFeedback>
-            </Modal>
-          </View>
-        </TouchableWithoutFeedback>
-      </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
+
+          {/* Username edit modal */}
+          <Modal visible={visibleUsernameModal} transparent={true} animationType="fade">
+            <TouchableWithoutFeedback onPress={handleOutsidePress}>
+              <View style={styles.modalContainer}>
+                <View style={[styles.modalContent, getDynamicModalContent()]}>
+                  <Text style={styles.modalTitle}>Change Username</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter new username"
+                    value={newUsername}
+                    onChangeText={setNewUsername}
+                  />
+                  <TouchableOpacity style={styles.submitButton} onPress={updateUsername}>
+                    <Text style={styles.submitButtonText}>Update</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
+        </View>
+      </TouchableWithoutFeedback>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  navcontainer:{
-    flex: 1,
-    justifyContent: 'space-between',
-    padding: 0,
-    backgroundColor: '#f9f9f9',
-    alignItems:'center',
-  },
   container: {
     flex: 1,
-    justifyContent: 'space-between',
-    padding: 10,
-    backgroundColor: '#f9f9f9',
-    justifyContent:"center",
-    alignItems:'center',
-    paddingLeft:50,
+    backgroundColor: '#f8f8f8',
+    paddingHorizontal: getResponsivePadding(),
+    paddingTop: heightScale(10),
+  },
+  innerContainer: {
+    flex: 1,
+    width: '100%',
+  },
+  profileSection: {
+    alignItems: 'center',
+    marginVertical: heightScale(20),
   },
   image: {
-    width: 150, 
-    height: 150, 
-    borderRadius: 100,
-    marginLeft:50,
-    marginBottom:40,
+    width: widthScale(100),
+    height: widthScale(100),
+    borderRadius: widthScale(50),
+    marginBottom: heightScale(10),
+    borderWidth: 3,
+    borderColor: '#007AF5',
+  },
+  usernameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   username: {
-    fontSize: 24,
+    fontSize: fontScale(20),
     fontWeight: 'bold',
-    marginBottom: 40,
+    color: '#333',
+    marginRight: widthScale(8),
+  },
+  editIcon: {
+    marginTop: heightScale(2),
+  },
+  settingsSection: {
+    backgroundColor: '#fff',
+    borderRadius: widthScale(10),
+    padding: widthScale(15),
+    marginVertical: heightScale(10),
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  sectionHeader: {
+    marginBottom: heightScale(15),
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    paddingBottom: heightScale(10),
+  },
+  sectionTitle: {
+    fontSize: fontScale(18),
+    fontWeight: 'bold',
+    color: '#007AF5',
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-    width: '100%',
+    paddingVertical: heightScale(12),
   },
   heading: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    width: 120,
+    fontSize: fontScale(16),
+    color: '#333',
   },
-  box: {
-    backgroundColor: '#EC8305',
-    padding: 10,
-    borderRadius: 25,
-    marginLeft: 'auto',
-    justifyContent: 'center',
+  dropdownSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingVertical: heightScale(6),
+    paddingHorizontal: widthScale(10),
   },
   selected: {
-    fontSize: 18,
-    color: '#fff',
+    fontSize: fontScale(16),
+    color: '#007AF5',
+    marginRight: widthScale(8),
   },
-  modal: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 20,
-    position: 'absolute',
-    top: 100,
-    left: 20,
-    right: 20,
-    zIndex: 1,
-  },
-  option: {
-    fontSize: 18,
-    color: '#fff',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+  divider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    width: '100%',
   },
   modalContainer: {
     flex: 1,
@@ -267,69 +402,67 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-    width: '80%',
-    alignItems: 'center',
+    padding: widthScale(20),
+    borderRadius: widthScale(10),
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: fontScale(18),
     fontWeight: 'bold',
-    marginBottom: 20,
+    color: '#333',
+    marginBottom: heightScale(15),
+    textAlign: 'center',
+  },
+  optionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: heightScale(12),
+    paddingHorizontal: widthScale(15),
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  selectedOption: {
+    backgroundColor: '#f5f9ff',
+  },
+  optionText: {
+    fontSize: fontScale(16),
+    color: '#333',
+  },
+  selectedOptionText: {
+    color: '#007AF5',
+    fontWeight: '500',
+  },
+  closeButton: {
+    marginTop: heightScale(15),
+    backgroundColor: '#007AF5',
+    paddingVertical: heightScale(12),
+    borderRadius: widthScale(6),
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontSize: fontScale(16),
+    fontWeight: '600',
   },
   input: {
     width: '100%',
-    padding: 10,
+    padding: widthScale(12),
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    marginBottom: 20,
+    borderColor: '#ddd',
+    borderRadius: widthScale(6),
+    marginBottom: heightScale(20),
+    fontSize: fontScale(16),
   },
   submitButton: {
-    backgroundColor: '#EC8305',
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: '#007AF5',
+    paddingVertical: heightScale(12),
+    borderRadius: widthScale(6),
     width: '100%',
     alignItems: 'center',
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    marginTop: 10,
-    padding: 10,
-    alignItems: 'center',
-    backgroundColor: '#EC8305',
-    borderRadius: 5,
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  navHeader: {
-    backgroundColor: '#007AF5',
-    paddingTop: 30,
-    borderBottomLeftRadius: 15,
-    borderBottomRightRadius: 15,
-    height: 90,
-    justifyContent: 'center',
-    paddingLeft: 70,
-    width: '100%',    
-  },
-  navHeaderText: {
-    color: '#fff',
-    fontSize: 30,
-    fontWeight: 'bold',
-    top: 15,
-    right: 10,
-  },
-  list: {
-    height: 30,
-    width: 30,
-    right: 50,
-    bottom: 20,
+    fontSize: fontScale(16),
+    fontWeight: '600',
   },
 });
