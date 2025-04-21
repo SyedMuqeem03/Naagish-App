@@ -118,7 +118,7 @@ export default function Convo() {
     }
 
     try {
-      const apiEndpoint = "https://tts-api-kohl.vercel.app/translate_and_speak";
+      const apiEndpoint = "https://tts-api-id9n.vercel.app/translate_and_speak";
       const requestBody = {
         text: transcriptText,
         language: IsselectedLanguage.code || "hi-IN",
@@ -263,7 +263,7 @@ export default function Convo() {
         if (transcriptionData && transcriptionData.transcript) {
           // 2. Send transcript for translation
           const apiEndpoint =
-            "https://tts-api-kohl.vercel.app/translate_and_speak";
+            "https://tts-api-id9n.vercel.app/translate_and_speak";
 
           const requestBody = {
             text: transcriptionData.transcript,
