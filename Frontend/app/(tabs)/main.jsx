@@ -68,32 +68,97 @@ export default function Translation() {
     return () => subscription.remove();
   }, []);
 
-  const playAudio = async (base64String) => {
+  const playBase64Audio = async (base64String) => {
     try {
-      if (sound) {
-        await sound.unloadAsync();
+      // Validate base64 string
+      if (!base64String || typeof base64String !== 'string') {
+        throw new Error('Invalid audio data received');
       }
+  
+      // Ensure any existing sound is properly unloaded
+      if (sound) {
+        try {
+          await sound.stopAsync();
+          await sound.unloadAsync();
+        } catch (err) {
+          // Ignore errors during cleanup
+        }
+        setSound(null);
+      }
+  
+      // Add a delay to ensure cleanup completes
+      await new Promise(resolve => setTimeout(resolve, 200));
       
+      // Create new sound object
       const newSound = new Audio.Sound();
-      await newSound.loadAsync({ uri: `data:audio/mp3;base64,${base64String}` });
       
-      setSound(newSound);
-      setIsPlaying(true);
+      // Configure audio first
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
       
-      await newSound.playAsync();
-      
+      // Set up event listener before loading
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.didJustFinish) {
           setIsPlaying(false);
+        } else if (status.error) {
+          console.error(`Playback error: ${status.error}`);
+          setIsPlaying(false);
         }
       });
+  
+      // Try with explicit audio format
+      console.log("Attempting to load audio...");
+      await newSound.loadAsync(
+        { uri: `data:audio/mpeg;base64,${base64String}` },
+        { shouldPlay: false, volume: 1.0, progressUpdateIntervalMillis: 100 },
+        true
+      );
       
-      // Provide haptic feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setSound(newSound);
+      console.log("Audio loaded successfully");
+      
+      // Play audio
+      const playbackStatus = await newSound.playAsync();
+      console.log("Playback started:", playbackStatus);
+      setIsPlaying(true);
+      
+      // Add haptic feedback
+      Haptics?.impactAsync?.(Haptics?.ImpactFeedbackStyle?.Medium);
+      
     } catch (error) {
-      console.error("Error playing audio:", error);
-      Alert.alert("Audio Error", "Could not play the audio. Please try again.");
-      setIsPlaying(false);
+      console.error("Error playing sound:", error);
+      
+      // Try alternative format if first attempt fails
+      try {
+        if (sound) {
+          await sound.unloadAsync();
+          setSound(null);
+        }
+        
+        const newSound = new Audio.Sound();
+        
+        // Try with WAV format instead
+        await newSound.loadAsync(
+          { uri: `data:audio/wav;base64,${base64String}` },
+          { shouldPlay: false, volume: 1.0 },
+          false
+        );
+        
+        setSound(newSound);
+        await newSound.playAsync();
+        setIsPlaying(true);
+        
+      } catch (fallbackError) {
+        console.error("Fallback also failed:", fallbackError);
+        Alert.alert(
+          "Audio Error", 
+          "Could not play the audio. The format may be unsupported on this device."
+        );
+        setIsPlaying(false);
+      }
     }
   };
 
@@ -132,15 +197,15 @@ export default function Translation() {
     }
 
     setIsLoading(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
+    
     try {
       const apiEndpoint = "https://tts-api-kohl.vercel.app/translate_and_speak";
       const requestBody = {
         text: inputText,
         language: sourceLanguage.code,
         target_language: targetLanguage.name.toLowerCase(),
-        voice_model: "arvind", // Default voice model
+        voice_model: "arvind"
+        // Removed audio_format to use default from server
       };
 
       const response = await fetch(apiEndpoint, {
@@ -156,8 +221,10 @@ export default function Translation() {
         setAudioBase64(result.audio_data);
         setTranslatedText(result.translated_text);
         
-        // Play audio automatically after translation
-        playAudio(result.audio_data);
+        // Play audio after a short delay to ensure UI has updated
+        setTimeout(() => {
+          playBase64Audio(result.audio_data);
+        }, 100);
         
         // Provide success feedback
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -274,7 +341,7 @@ export default function Translation() {
                   
                   <TouchableOpacity
                     style={[styles.actionButton, styles.playButton]}
-                    onPress={isPlaying ? stopAudio : () => playAudio(audioBase64)}
+                    onPress={isPlaying ? stopAudio : () => playBase64Audio(audioBase64)}
                     disabled={!audioBase64}
                   >
                     <Ionicons 

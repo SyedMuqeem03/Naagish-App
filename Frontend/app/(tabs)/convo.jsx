@@ -1,4 +1,5 @@
 import { Audio } from "expo-av";
+import * as Haptics from 'expo-haptics'; // Add this import if you want haptic feedback
 import {
   View,
   Text,
@@ -11,8 +12,13 @@ import {
   Alert,
   Dimensions,
   Platform,
+  SafeAreaView,
 } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
+import { LanguageSelector } from "@/components/ui/LanguageSelector";
+import { scale} from "@/utils/ResponsiveUtils";
+
+
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 
 const { width, height } = Dimensions.get("window");
@@ -84,6 +90,8 @@ export default function Convo() {
     { name: "Malayalam", code: "ml-IN" },
     { name: "Odia", code: "od-IN" },
   ];
+
+  // FIX 1: Separate state for each dropdown
   const [selectedLanguage, setSelectedLanguage] = useState({
     name: "",
     code: "",
@@ -92,13 +100,16 @@ export default function Convo() {
     name: "",
     code: "",
   });
-
   const [isClicked, setIsClicked] = useState(false);
   const [Clicked, setClicked] = useState(false);
-
-  const [data, setData] = useState(languages_list);
-  const [search, setSearch] = useState("");
-  const searchRef = useRef();
+  
+  // FIX 2: Separate data states for each dropdown
+  const [data1, setData1] = useState(languages_list);
+  const [data2, setData2] = useState(languages_list);
+  const [search1, setSearch1] = useState("");
+  const [search2, setSearch2] = useState("");
+  const searchRef1 = useRef();
+  const searchRef2 = useRef();
 
   const translateAndSpeak = async (transcriptText) => {
     if (!transcriptText) {
@@ -115,6 +126,7 @@ export default function Convo() {
         voice_model: "arvind",
       };
 
+      setIsLoading(true);
       const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -130,6 +142,8 @@ export default function Convo() {
     } catch (error) {
       console.error("Translation error:", error);
       Alert.alert("Error", "Translation failed");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -175,19 +189,15 @@ export default function Convo() {
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
       console.log("Recording stopped and stored at", uri);
-      console.log(recording);
 
       try {
         let form = new FormData();
-        // Log the URI and file object
-        console.log("Audio URI:", uri);
-
+        
         const fileToUpload = {
           uri: uri,
           type: "audio/wav",
           name: "recording.wav",
         };
-        console.log("File object:", fileToUpload);
 
         form.append("file", fileToUpload);
         form.append(
@@ -207,12 +217,9 @@ export default function Convo() {
           headers: {
             "api-subscription-key": "7681997b-fff6-4626-8791-9fef034d19d2",
             Accept: "application/json",
-            // Remove Content-Type to let FormData set it with boundary
           },
           body: form,
         };
-
-        console.log(form);
 
         console.log("Sending request to Sarvam API...");
         const response = await fetch(
@@ -221,7 +228,6 @@ export default function Convo() {
         );
         console.log("Response status:", response.status);
 
-        // Get response text first
         const responseText = await response.text();
         console.log("Response text:", responseText);
 
@@ -229,10 +235,9 @@ export default function Convo() {
           throw new Error(`Server error: ${responseText}`);
         }
 
-        // Parse JSON only if we have valid JSON response
         const data = JSON.parse(responseText);
         console.log("Parsed response:", data);
-        setTranscript(data.transcript || ""); // Store transcript
+        setTranscript(data.transcript || "");
         return data;
       } catch (error) {
         console.error("Transcription error:", error);
@@ -249,8 +254,6 @@ export default function Convo() {
   };
 
   const handleRecordingProcess = async () => {
-    console.log("hello");
-
     if (recording) {
       setIsProcessing(true);
       try {
@@ -261,13 +264,6 @@ export default function Convo() {
           // 2. Send transcript for translation
           const apiEndpoint =
             "https://tts-api-kohl.vercel.app/translate_and_speak";
-          console.log("IsSelected Language:", IsselectedLanguage);
-          console.log("isSelected Language name:", IsselectedLanguage.name);
-          console.log("IsSelected Language code:", IsselectedLanguage.code);
-
-          console.log("Selected Language:", selectedLanguage);
-          console.log("Selected Language name:", selectedLanguage.name);
-          console.log("Selected Language code:", selectedLanguage.code);
 
           const requestBody = {
             text: transcriptionData.transcript,
@@ -318,233 +314,409 @@ export default function Convo() {
     }
   };
 
-  const onSearch = (search) => {
+  // FIX 3: Separate search functions for each dropdown
+  const onSearch1 = (search) => {
     if (search !== "") {
       let tempData = languages_list.filter((item) => {
         return item.name.toLowerCase().indexOf(search.toLowerCase()) > -1;
       });
-      setData(tempData);
+      setData1(tempData);
     } else {
-      setData(languages_list);
+      setData1(languages_list);
     }
   };
 
+  const onSearch2 = (search) => {
+    if (search !== "") {
+      let tempData = languages_list.filter((item) => {
+        return item.name.toLowerCase().indexOf(search.toLowerCase()) > -1;
+      });
+      setData2(tempData);
+    } else {
+      setData2(languages_list);
+    }
+  };
+
+  // Close dropdowns when clicking outside
+  const handleOutsideClick = () => {
+    if (isClicked) setIsClicked(false);
+    if (Clicked) setClicked(false);
+  };
+
   return (
-    <View style={styles.container}>
-
-      {/* Upper box */}
-      <View style={styles.contentBox}>
-        <View style={styles.languageBox}>
-          <Text style={styles.languageLabel}>
-            {selectedLanguage.name || "Select Language"}
-          </Text>
-        </View>
-
-        <View style={styles.translationBox}>
-          <TouchableOpacity
-            style={styles.replayButton}
-            onPress={async () => {
-              console.log("upper Replay pressed!");
-              await playBase64Audio(base64String);
-            }}
-          >
-            <Image source={require("./Group.png")} style={styles.replayIcon} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              setTranscript("");
-              setTranslatedText("");
-              setIsUp(true);
-              handleRecordingProcess();
-            }}
-            style={[styles.mic, isProcessing && styles.disabledMic]}
-            disabled={isProcessing}
-          >
-            <Image source={require("./monogram.png")} style={styles.micIcon} />
-            {isProcessing && <ActivityIndicator size="small" color="#000" />}
-          </TouchableOpacity>
-
-          <View style={styles.transcriptContainer}>
-            <Text style={styles.transcriptText}>
-              {isUp ? transcript || "Speak to see transcription" : "Speak to see transcription"}
+    <SafeAreaView style={styles.container}>
+      <TouchableOpacity
+        activeOpacity={1}
+        style={styles.innerContainer}
+        onPress={handleOutsideClick}
+      >
+        {/* Upper box */}
+        <View style={styles.contentBox}>
+          <View style={styles.languageBox}>
+            <Text style={styles.languageLabel}>
+              {selectedLanguage.name || "Select Language"}
             </Text>
-            {!isUp && translatedText ? (
-              <View style={styles.translatedTextContainer}>
-                <Text style={styles.translatedTextStyle}>{translatedText}</Text>
-              </View>
-            ) : null}
+          </View>
+
+          <View style={styles.translationBox}>
+            {base64String && (
+              <TouchableOpacity
+                style={styles.replayButton}
+                onPress={async () => {
+                  await playBase64Audio(base64String);
+                }}
+              >
+                <Image source={require("./Group.png")} style={styles.replayIcon} />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              onPress={() => {
+                setTranscript("");
+                setTranslatedText("");
+                setIsUp(true);
+                handleRecordingProcess();
+              }}
+              style={[styles.mic, isProcessing && styles.disabledMic]}
+              disabled={isProcessing}
+            >
+              <Image source={require("./monogram.png")} style={styles.micIcon} />
+              {isProcessing && <ActivityIndicator size="small" color="#000" />}
+            </TouchableOpacity>
+
+            <View style={styles.transcriptContainer}>
+              <Text style={styles.transcriptText}>
+                {isUp ? transcript || "Speak to see transcription" : "Speak to see transcription"}
+              </Text>
+              {!isUp && translatedText ? (
+                <View style={styles.translatedTextContainer}>
+                  <Text style={styles.translatedTextStyle}>{translatedText}</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* Language Selector */}
-      <View style={styles.languageSelectorContainer}>
-        {/* First Language Dropdown */}
-        <View style={styles.dropdownWrapper}>
-          <TouchableOpacity
-            style={styles.dropdownSelector}
-            onPress={() => setIsClicked(!isClicked)}
-          >
-            <Text style={styles.selectorText}>
-              {selectedLanguage.name === "" ? "Select Language" : selectedLanguage.name}
-            </Text>
-            <Image
-              source={isClicked ? require("./upload.png") : require("./dropdown.png")}
-              style={styles.dropdownIcon}
-            />
-          </TouchableOpacity>
+        {/* Enhanced Language Selector */}
+        {/* <View style={styles.languageSelectorContainer}> */}
+          {/* First Language Dropdown */}
+          {/* <View style={styles.dropdownWrapper}>
+            <TouchableOpacity
+              style={[
+                styles.dropdownSelector,
+                isClicked && styles.activeDropdownSelector
+              ]}
+              onPress={() => {
+                // Provide feedback
+                Haptics?.impactAsync?.(Haptics?.ImpactFeedbackStyle?.Medium);
+                setIsClicked(!isClicked);
+                // Close the other dropdown if open
+                if (Clicked) setClicked(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.selectorContent}>
+                <Text style={styles.selectorLabel}>From</Text>
+                
+                <Text style={selectedLanguage.name===""?styles.placeholderText:styles.selectorText}>
 
-          {isClicked && (
-            <View style={styles.dropdown}>
-              <TextInput
-                placeholder="Search.."
-                value={search}
-                ref={searchRef}
-                onChangeText={(txt) => {
-                  onSearch(txt);
-                  setSearch(txt);
-                }}
-                style={styles.searchInput}
-              />
-
-              <FlatList
-                data={data}
-                showsVerticalScrollIndicator={true}
-                nestedScrollEnabled={true}
-                scrollEnabled={true}
-                style={styles.dropdownList}
-                keyExtractor={(item, index) => index.toString()}
-                renderItem={({item}) => (
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setSelectedLanguage({ name: item.name, code: item.code });
-                      setIsClicked(false);
-                      onSearch("");
-                      setSearch("");
-                    }}
-                  >
-                    <Text style={styles.dropdownItemText}>{item.name}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-            </View>
-          )}
-        </View>
-
-        <FontAwesome6
-          style={styles.switchIcon}
-          name="arrow-right-arrow-left"
-          size={24}
-          color="black"
-        />
-
-        {/* Second Language Dropdown */}
-        <View style={styles.dropdownWrapper}>
-          <TouchableOpacity
-            style={styles.dropdownSelector}
-            onPress={() => setClicked(!Clicked)}
-          >
-            <Text style={styles.selectorText}>
-              {IsselectedLanguage.name === "" ? "Select Language" : IsselectedLanguage.name}
-            </Text>
-            <Image
-              source={Clicked ? require("./upload.png") : require("./dropdown.png")}
-              style={styles.dropdownIcon}
-            />
-          </TouchableOpacity>
-
-          {Clicked && (
-            <View style={styles.dropdown}>
-              <TextInput
-                placeholder="Search.."
-                value={search}
-                ref={searchRef}
-                onChangeText={(txt) => {
-                  onSearch(txt);
-                  setSearch(txt);
-                }}
-                style={styles.searchInput}
-              />
-
-              <FlatList
-                data={data}
-                style={styles.dropdownList}
-                nestedScrollEnabled={true}
-                scrollEnabled={true}
-                keyExtractor={(item, index) => index.toString()}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setIsSelectedLanguage({
-                        name: item.name,
-                        code: item.code,
-                      });
-                      setClicked(false);
-                      onSearch("");
-                      setSearch("");
-                    }}
-                  >
-                    <Text style={styles.dropdownItemText}>{item.name}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* Lower box */}
-      <View style={styles.contentBox}>
-        <View style={styles.languageBox}>
-          <Text style={styles.languageLabel}>
-            {IsselectedLanguage.name || "Select Language"}
-          </Text>
-        </View>
-
-        <View style={styles.translationBox}>
-          <TouchableOpacity
-            style={styles.replayButton}
-            onPress={async () => {
-              alert("Replay pressed!");
-              await playBase64Audio(base64String);
-            }}
-          >
-            <Image source={require("./Group.png")} style={styles.replayIcon} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.mic, isProcessing && styles.disabledMic]}
-            disabled={isProcessing}
-            onPress={() => {
-              setTranscript("");
-              setTranslatedText("");
-              setIsUp(false);
-              handleRecordingProcess();
-            }}
-          >
-            <Image source={require("./monogram.png")} style={styles.micIcon} />
-            {isProcessing && <ActivityIndicator size="small" color="#000" />}
-          </TouchableOpacity>
-
-          <View style={styles.transcriptContainer}>
-            <Text style={styles.transcriptText}>
-              {!isUp ? transcript || "Speak to see transcription" : "Speak to see transcription"}
-            </Text>
-            {isUp && translatedText ? (
-              <View style={styles.translatedTextContainer}>
-                <Text style={styles.translatedTextStyle}>{translatedText}</Text>
+                  {IsselectedLanguage.name || "Select Language"}
+                </Text>
               </View>
-            ) : null}
+              <FontAwesome6
+                name={isClicked ? "chevron-up" : "chevron-down"}
+                size={16}
+                color="#555"
+                style={styles.dropdownIcon}
+              />
+            </TouchableOpacity>
+
+            {isClicked && (
+              <View style={styles.dropdown}>
+                <View style={styles.searchWrapper}>
+                  <FontAwesome6 name="search" size={16} color="#777" style={styles.searchIcon} />
+                  <TextInput
+                    placeholder="Search languages..."
+                    value={search1}
+                    ref={searchRef1}
+                    onChangeText={(txt) => {
+                      onSearch1(txt);
+                      setSearch1(txt);
+                    }}
+                    style={styles.searchInput}
+                    placeholderTextColor="#999"
+                  />
+                  {search1.length > 0 && (
+                    <TouchableOpacity 
+                      onPress={() => {
+                        setSearch1("");
+                        onSearch1("");
+                      }}
+                      style={styles.clearSearch}
+                    >
+                      <FontAwesome6 name="times-circle" size={16} color="#999" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <FlatList
+                  data={data1}
+                  showsVerticalScrollIndicator={true}
+                  nestedScrollEnabled={true}
+                  scrollEnabled={true}
+                  style={styles.dropdownList}
+                  keyExtractor={(item, index) => `lang1-${index}`}
+                  contentContainerStyle={styles.dropdownListContent}
+                  renderItem={({item}) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.dropdownItem,
+                        selectedLanguage.code === item.code && styles.selectedDropdownItem
+                      ]}
+                      onPress={() => {
+                        // Provide feedback
+                        Haptics?.impactAsync?.(Haptics?.ImpactFeedbackStyle?.Light);
+                        setSelectedLanguage({ name: item.name, code: item.code });
+                        setIsClicked(false);
+                        onSearch1("");
+                        setSearch1("");
+                      }}
+                    >
+                      <Text style={[
+                        styles.dropdownItemText,
+                        selectedLanguage.code === item.code && styles.selectedDropdownItemText
+                      ]}>
+                        {item.name}
+                      </Text>
+                      {selectedLanguage.code === item.code && (
+                        <FontAwesome6 name="check" size={16} color="#4CAF50" />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  ListEmptyComponent={
+                    <View style={styles.emptyListContainer}>
+                      <Text style={styles.emptyListText}>No languages found</Text>
+                    </View>
+                  }
+                />
+              </View>
+            )}
+          </View> */}
+          <View style={styles.languageSelectionContainer}>
+            <View style={styles.languageSelectorRow}>
+              <LanguageSelector
+                selectedLanguage={selectedLanguage}
+                onSelectLanguage={setSelectedLanguage}
+                options={languages_list}
+                label="From"
+                style={styles.languageSelector}
+              />
+               <TouchableOpacity
+            onPress={() => {
+              // Swap languages
+              const temp = selectedLanguage;
+              setSelectedLanguage(IsselectedLanguage);
+              setIsSelectedLanguage(temp);
+              // Provide feedback
+              Haptics?.impactAsync?.(Haptics?.ImpactFeedbackStyle?.Medium);
+            }}
+            style={styles.switchButton}
+          >
+            <FontAwesome6
+              name="arrow-right-arrow-left"
+              size={18}
+              color="#444"
+            />
+          </TouchableOpacity>
+              
+              <LanguageSelector
+                selectedLanguage={IsselectedLanguage}
+                onSelectLanguage={setIsSelectedLanguage}
+                options={languages_list}
+                label="To"
+                style={styles.languageSelector}
+              />
+            </View>
+          </View>
+          
+
+          {/* <TouchableOpacity
+            onPress={() => {
+              // Swap languages
+              const temp = selectedLanguage;
+              setSelectedLanguage(IsselectedLanguage);
+              setIsSelectedLanguage(temp);
+              // Provide feedback
+              Haptics?.impactAsync?.(Haptics?.ImpactFeedbackStyle?.Medium);
+            }}
+            style={styles.switchButton}
+          >
+            <FontAwesome6
+              name="arrow-right-arrow-left"
+              size={18}
+              color="#444"
+            />
+          </TouchableOpacity> */}
+
+          {/* Second Language Dropdown */}
+          {/* <View style={styles.dropdownWrapper}>
+            <TouchableOpacity
+              style={[
+                styles.dropdownSelector,
+                Clicked && styles.activeDropdownSelector
+              ]}
+              onPress={() => {
+                // Provide feedback
+                Haptics?.impactAsync?.(Haptics?.ImpactFeedbackStyle?.Medium);
+                setClicked(!Clicked);
+                // Close the other dropdown if open
+                if (isClicked) setIsClicked(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.selectorContent}>
+                <Text style={styles.selectorLabel}>To</Text>
+                <Text style={selectedLanguage.name===""?styles.placeholderText:styles.selectorText}>
+                  {selectedLanguage.name || "Select Language"}
+                </Text>
+              </View>
+              <FontAwesome6
+                name={Clicked ? "chevron-up" : "chevron-down"}
+                size={16}
+                color="#555"
+                style={styles.dropdownIcon}
+              />
+            </TouchableOpacity>
+
+            {Clicked && (
+              <View style={styles.dropdown}>
+                <View style={styles.searchWrapper}>
+                  <FontAwesome6 name="search" size={16} color="#777" style={styles.searchIcon} />
+                  <TextInput
+                    placeholder="Search languages..."
+                    value={search2}
+                    ref={searchRef2}
+                    onChangeText={(txt) => {
+                      onSearch2(txt);
+                      setSearch2(txt);
+                    }}
+                    style={styles.searchInput}
+                    placeholderTextColor="#999"
+                  />
+                  {search2.length > 0 && (
+                    <TouchableOpacity 
+                      onPress={() => {
+                        setSearch2("");
+                        onSearch2("");
+                      }}
+                      style={styles.clearSearch}
+                    >
+                      <FontAwesome6 name="times-circle" size={16} color="#999" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <FlatList
+                  data={data2}
+                  showsVerticalScrollIndicator={true}
+                  nestedScrollEnabled={true}
+                  scrollEnabled={true}
+                  style={styles.dropdownList}
+                  keyExtractor={(item, index) => `lang2-${index}`}
+                  contentContainerStyle={styles.dropdownListContent}
+                  renderItem={({item}) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.dropdownItem,
+                        IsselectedLanguage.code === item.code && styles.selectedDropdownItem
+                      ]}
+                      onPress={() => {
+                        // Provide feedback
+                        Haptics?.impactAsync?.(Haptics?.ImpactFeedbackStyle?.Light);
+                        setIsSelectedLanguage({ name: item.name, code: item.code });
+                        setClicked(false);
+                        onSearch2("");
+                        setSearch2("");
+                      }}
+                    >
+                      <Text style={[
+                        styles.dropdownItemText,
+                        IsselectedLanguage.code === item.code && styles.selectedDropdownItemText
+                      ]}>
+                        {item.name}
+                      </Text>
+                      {IsselectedLanguage.code === item.code && (
+                        <FontAwesome6 name="check" size={16} color="#4CAF50" />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  ListEmptyComponent={
+                    <View style={styles.emptyListContainer}>
+                      <Text style={styles.emptyListText}>No languages found</Text>
+                    </View>
+                  }
+                />
+              </View>
+            )}
+          </View> */}
+        {/* </View> */}
+
+        {/* Lower box */}
+        <View style={styles.contentBox}>
+          <View style={styles.languageBox}>
+            <Text style={styles.languageLabel}>
+              {IsselectedLanguage.name || "Select Language "}
+            </Text>
+          </View>
+
+          <View style={styles.translationBox}>
+            {base64String && (
+              <TouchableOpacity
+                style={styles.replayButton}
+                onPress={async () => {
+                  await playBase64Audio(base64String);
+                }}
+              >
+                <Image source={require("./Group.png")} style={styles.replayIcon} />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[styles.mic, isProcessing && styles.disabledMic]}
+              disabled={isProcessing}
+              onPress={() => {
+                setTranscript("");
+                setTranslatedText("");
+                setIsUp(false);
+                handleRecordingProcess();
+              }}
+            >
+              <Image source={require("./monogram.png")} style={styles.micIcon} />
+              {isProcessing && <ActivityIndicator size="small" color="#000" />}
+            </TouchableOpacity>
+
+            <View style={styles.transcriptContainer}>
+              <Text style={styles.transcriptText}>
+                {!isUp ? transcript || "Speak to see transcription" : "Speak to see transcription"}
+              </Text>
+              {isUp && translatedText ? (
+                <View style={styles.translatedTextContainer}>
+                  <Text style={styles.translatedTextStyle}>{translatedText}</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
-      </View>
 
-      {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
-      {error && <Text style={styles.errorText}>{error}</Text>}
-    </View>
+        {isLoading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#0000ff" />
+            <Text style={styles.loadingText}>Processing...</Text>
+          </View>
+        )}
+        {error && <Text style={styles.errorText}>{error}</Text>}
+      </TouchableOpacity>
+    </SafeAreaView>
   );
 }
 
@@ -552,6 +724,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f9f9f9",
+  },
+  innerContainer: {
+    flex: 1,
     paddingHorizontal: "5%",
     paddingTop: 20,
   },
@@ -655,6 +830,30 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
   },
+  errorText: {
+    color: "red",
+    textAlign: "center",
+    marginTop: 10,
+    fontSize: 14,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10000,
+  },
+  loadingText: {
+    marginTop: 8,
+    color: '#0000ff',
+    fontSize: 16,
+  },
+  
+  // Enhanced language selector styles
   languageSelectorContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -662,13 +861,13 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingVertical: 15,
     position: "relative",
-    zIndex: 999, // Ensure dropdowns appear above other content
+    zIndex: 5000,
   },
   dropdownWrapper: {
     flex: 1,
     maxWidth: "45%",
     position: "relative",
-    zIndex: 1000, 
+    zIndex: 5001,
   },
   dropdownSelector: {
     flexDirection: "row",
@@ -679,19 +878,200 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: "#8e8e8e",
-    height: 48,
+    borderColor: "#d1d1d1",
+    height: 60,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  activeDropdownSelector: {
+    borderColor: "#6a5ae0",
+    shadowColor: "#6a5ae0",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  selectorContent: {
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  selectorLabel: {
+    fontSize: 12,
+    color: "#777",
+    marginBottom: 4,
+    fontWeight: "500",
+  },
+  placeholderText: {
+    fontWeight: "600",
+    fontSize: 12,
+    color: "#333",
   },
   selectorText: {
     fontWeight: "600",
-    fontSize: 14,
-    flex: 1,
+    fontSize: 16,
+    color: "#333",
   },
   dropdownIcon: {
-    width: 14,
-    height: 8,
-    resizeMode: "contain",
-    marginLeft: 5,
+    marginLeft: 8,
+  },
+  // switchButton: {
+  //   backgroundColor: "#f5f5f5",
+  //   width: 44,
+  //   height: 44,
+  //   borderRadius: 22,
+  //   alignItems: "center",
+  //   justifyContent: "center",
+  //   shadowColor: "#000",
+  //   shadowOffset: { width: 0, height: 1 },
+  // },
+  dropdownItemText: {
+    fontWeight: "500",
+    fontSize: 14,
+    color: "#333",
+  },
+  errorText: {
+    color: "red",
+    textAlign: "center",
+    marginTop: 10,
+    fontSize: 14,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10000,
+  },
+  loadingText: {
+    marginTop: 8,
+    color: '#0000ff',
+    fontSize: 16,
+  },
+  selectorContent: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    flex: 1,
+  },
+  selectorLabel: {
+    fontSize: 12,
+    color: "#777",
+  },
+  activeDropdownSelector: {
+    borderColor: "#4CAF50",
+  },
+  searchWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderColor: "#ddd",
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  clearSearch: {
+    marginLeft: 8,
+  },
+  dropdownListContent: {
+    paddingBottom: 10,
+  },
+  selectedDropdownItem: {
+    backgroundColor: "#f0f0f0",
+  },
+  selectedDropdownItemText: {
+    color: "#4CAF50",
+  },
+  emptyListContainer: {
+    padding: 20,
+    alignItems: "center",
+  },
+  emptyListText: {
+    color: "#999",
+    fontSize: 14,
+  },
+  // Enhanced language selector styles
+  languageSelectorContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    paddingVertical: 15,
+    position: "relative",
+    zIndex: 5000, // Higher z-index to ensure dropdowns show above other elements
+  },
+  dropdownWrapper: {
+    flex: 1,
+    maxWidth: "45%",
+    position: "relative",
+    zIndex: 5001, // Higher than container
+  },
+  dropdownSelector: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#d1d1d1",
+    height: 60,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  activeDropdownSelector: {
+    borderColor: "#6a5ae0",
+    shadowColor: "#6a5ae0",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  selectorContent: {
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  selectorLabel: {
+    fontSize: 12,
+    color: "#777",
+    marginBottom: 4,
+    fontWeight: "500",
+  },
+  // selectorText: {
+  //   fontWeight: "600",
+  //   fontSize: 16,
+  //   color: "#333",
+  // },
+  dropdownIcon: {
+    marginLeft: 8,
+  },
+  switchButton: {
+    backgroundColor: "#f5f5f5",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    marginHorizontal: 8,
+    marginVertical: 10,
   },
   dropdown: {
     position: "absolute",
@@ -701,50 +1081,83 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     marginTop: 5,
-    zIndex: 1000,
+    zIndex: 5002, // Higher than wrapper
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
-    height:265,
-    // maxHeight: 265,
-  },
-  searchInput: {
-    margin: 10,
-    borderWidth: 0.5,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderWidth: 1,
     borderColor: "#ddd",
+    maxHeight: 320, // Fixed maximum height
+    overflow: "hidden",
+  },
+  searchWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
     backgroundColor: "#f9f9f9",
   },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: "#333",
+  },
+  clearSearch: {
+    padding: 4,
+  },
   dropdownList: {
-    maxHeight: 240,
+    maxHeight: 250, // Fixed height to enable scrolling
+  },
+  dropdownListContent: {
+    paddingBottom: 5,
   },
   dropdownItem: {
-    paddingVertical: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: 0.5,
     borderColor: "#eee",
   },
+  selectedDropdownItem: {
+    backgroundColor: "rgba(106, 90, 224, 0.05)",
+  },
   dropdownItemText: {
     fontWeight: "500",
-    fontSize: 14,
+    fontSize: 15,
     color: "#333",
   },
-  switchIcon: {
-    marginHorizontal: 8,
+  selectedDropdownItemText: {
+    color: "#6a5ae0",
+    fontWeight: "600",
   },
-  errorText: {
-    color: "red",
-    textAlign: "center",
-    marginTop: 10,
+  emptyListContainer: {
+    padding: 20,
+    alignItems: "center",
+  },
+  emptyListText: {
+    color: "#999",
     fontSize: 14,
+    fontStyle: "italic",
   },
-  list: {
-    height: 28,
-    width: 28,
-    resizeMode: "contain",
-  }
+  languageSelectionContainer: {
+    marginBottom: scale(16),
+  },
+  languageSelectorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+   languageSelector: {
+    flex: 1,
+  },
 });
