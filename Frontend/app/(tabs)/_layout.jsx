@@ -25,8 +25,8 @@ export default function TabLayout() {
       setActiveScreen('Home');
     } else if (pathname.includes('main')) {
       setActiveScreen('Translator');
-    } else if (pathname.includes('history')) {
-      setActiveScreen('History');
+    } else if (pathname.includes('about')) { // Changed from 'history'
+      setActiveScreen('About'); // Changed from 'History'
     } else if (pathname.includes('settings')) {
       setActiveScreen('Settings');
     }
@@ -159,13 +159,13 @@ export default function TabLayout() {
         />
 
         <Tabs.Screen
-          name='history'
+          name='about' // Changed from 'history'
           options={{
-            tabBarLabel: 'History',
+            tabBarLabel: 'About', // Changed from 'History'
             tabBarIcon: ({ focused }) => (
               <View style={styles.tabIconContainer}>
                 <MaterialIcons
-                  name="history"
+                  name="info-outline" // Changed from "history"
                   size={widthScale(24)}
                   color={focused ? "#007AF5" : "gray"}
                 />

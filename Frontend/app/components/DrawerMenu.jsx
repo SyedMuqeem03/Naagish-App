@@ -80,10 +80,10 @@ const DrawerMenu = ({ visible, onClose }) => {
 
             <TouchableOpacity 
               style={styles.menuItem} 
-              onPress={() => navigateTo('/history')}
+              onPress={() => navigateTo('/about')}
             >
-              <MaterialIcons name="history" size={24} color="#333" />
-              <Text style={styles.menuItemText}>History</Text>
+              <MaterialIcons name="about" size={24} color="#333" />
+              <Text style={styles.menuItemText}>About</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
