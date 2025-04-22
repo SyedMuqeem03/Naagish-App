@@ -204,7 +204,7 @@ export default function Translation() {
         text: inputText,
         language: sourceLanguage.code,
         target_language: targetLanguage.name.toLowerCase(),
-        voice_model: "arvind"
+        voice_model: "meera"
         // Removed audio_format to use default from server
       };
 
