@@ -23,7 +23,7 @@ import { scale, moderateScale, fontScale } from "@/utils/ResponsiveUtils";
 import * as Clipboard from 'expo-clipboard';
 
 const languages_list = [
-  { name: "English", code: "en-US" },
+  // { name: "English", code: "en-US" },
   { name: "Hindi", code: "hi-IN" },
   { name: "Telugu", code: "te-IN" },
   { name: "Punjabi", code: "pa-IN" },
@@ -43,8 +43,8 @@ export default function Translation() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [sound, setSound] = useState(null);
-  const [sourceLanguage, setSourceLanguage] = useState({ name: "English", code: "en-US" });
-  const [targetLanguage, setTargetLanguage] = useState({ name: "Hindi", code: "hi-IN" });
+  const [sourceLanguage, setSourceLanguage] = useState({ name: "Marathi", code: "mr-IN" });
+  const [targetLanguage, setTargetLanguage] = useState({ name: "Telugu", code: "hi-IN" });
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
   const inputRef = useRef(null);
   
@@ -204,7 +204,7 @@ export default function Translation() {
         text: inputText,
         language: sourceLanguage.code,
         target_language: targetLanguage.name.toLowerCase(),
-        voice_model: "arvind"
+        voice_model: "meera"
         // Removed audio_format to use default from server
       };
 

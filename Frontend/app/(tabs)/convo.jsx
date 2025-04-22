@@ -119,12 +119,12 @@ export default function Convo() {
   const getDefaultVoiceModel = (targetLang) => {
     // Map target languages to appropriate voice models
     const voiceModels = {
-      hindi: "arvind",
-      telugu: "arvind",
-      tamil: "arvind",
+      hindi: "meera",
+      telugu: "meera",
+      tamil: "meera",
       // Add more language-specific voice models as needed
     };
-    return voiceModels[targetLang] || "arvind";
+    return voiceModels[targetLang] || "meera";
   };
 
   const createTranslationRequest = (text, isSpeakerA) => {

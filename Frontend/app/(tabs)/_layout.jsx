@@ -131,6 +131,14 @@ export default function TabLayout() {
           name='main'
           options={{
             tabBarLabel: 'Translate',
+            tabBarLabelStyle: {
+              fontSize: fontScale(14), // Increased from 12
+              fontWeight: '600', // Made slightly bolder
+              position: 'absolute',
+              bottom: heightScale(0),
+              
+             
+            },
             tabBarIcon: ({ focused }) => (
               <View style={styles.mainTabContainer}>
                 <LinearGradient
@@ -266,6 +274,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: heightScale(-5),
     marginBottom: heightScale(8),
+    
   },
   mainTabButton: {
     width: widthScale(54),
