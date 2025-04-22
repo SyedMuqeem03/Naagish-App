@@ -118,12 +118,12 @@ export default function Convo() {
     }
 
     try {
-      const apiEndpoint = "https://tts-api-id9n.vercel.app/translate_and_speak";
+      const apiEndpoint = "https://tts-api-kohl.vercel.app/translate_and_speak";
       const requestBody = {
         text: transcriptText,
         language: IsselectedLanguage.code || "hi-IN",
         target_language: IsselectedLanguage.name?.toLowerCase() || "telugu",
-        voice_model: "meera",
+        voice_model: "arvind",
       };
 
       setIsLoading(true);
@@ -263,7 +263,7 @@ export default function Convo() {
         if (transcriptionData && transcriptionData.transcript) {
           // 2. Send transcript for translation
           const apiEndpoint =
-            "https://tts-api-id9n.vercel.app/translate_and_speak";
+            "https://tts-api-kohl.vercel.app/translate_and_speak";
 
           const requestBody = {
             text: transcriptionData.transcript,
@@ -281,7 +281,7 @@ export default function Convo() {
               : IsselectedLanguage.name.toLowerCase() === ""
               ? "telugu"
               : IsselectedLanguage.name.toLowerCase(),
-            voice_model: "meera",
+            voice_model: "arvind",
           };
 
           // 3. Make translation request
@@ -358,9 +358,6 @@ export default function Convo() {
             </Text>
           </View>
 
-          
-        
-
           <View style={styles.translationBox}>
             {base64String && (
               <TouchableOpacity
@@ -387,8 +384,6 @@ export default function Convo() {
               {isProcessing && <ActivityIndicator size="small" color="#000" />}
             </TouchableOpacity>
 
-            
-
             <View style={styles.transcriptContainer}>
               <Text style={styles.transcriptText}>
                 {isUp ? transcript || "Speak to see transcription" : "Speak to see transcription"}
@@ -401,8 +396,6 @@ export default function Convo() {
             </View>
           </View>
         </View>
-
-        
 
         {/* Enhanced Language Selector */}
         {/* <View style={styles.languageSelectorContainer}> */}
