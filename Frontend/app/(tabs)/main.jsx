@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform
 } from "react-native";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { Audio } from "expo-av";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
@@ -21,6 +21,10 @@ import { Button } from "@/components/ui/Button";
 import { Colors, BorderRadius, Typography, Spacing, Shadows } from "@/constants/Theme";
 import { scale, moderateScale, fontScale } from "@/utils/ResponsiveUtils";
 import * as Clipboard from 'expo-clipboard';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../../firebaseConfig';
+import { router } from 'expo-router';
+import { TranslationContext } from './_layout';
 
 const languages_list = [
   // { name: "English", code: "en-US" },
@@ -47,6 +51,7 @@ export default function Translation() {
   const [targetLanguage, setTargetLanguage] = useState({ name: "Telugu", code: "hi-IN" });
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
   const inputRef = useRef(null);
+  const { isTranslating, setIsTranslating, terminateTranslation, abortControllerRef, activeTab } = useContext(TranslationContext);
   
   // Clean up sound when component unmounts
   useEffect(() => {
@@ -66,6 +71,45 @@ export default function Translation() {
       }
     );
     return () => subscription.remove();
+  }, []);
+
+  // Replace the existing useEffect with this updated version
+  useEffect(() => {
+    const params = router.params;
+    console.log("Received params:", params);
+    
+    if (params?.inputText) {
+      setInputText(params.inputText);
+      
+      if (params.sourceLanguage && params.sourceCode) {
+        setSourceLanguage({
+          name: params.sourceLanguage,
+          code: params.sourceCode
+        });
+      }
+      
+      if (params.targetLanguage && params.targetCode) {
+        setTargetLanguage({
+          name: params.targetLanguage,
+          code: params.targetCode
+        });
+      }
+      
+      console.log("Form updated with history data");
+    }
+  }, [router.params]); // Add router.params as a dependency
+
+  // Listen for termination signals
+  useEffect(() => {
+    return () => {
+      // Clean up any translation processes if component unmounts
+      if (isTranslating) {
+        // Cancel any API requests
+        // Stop any audio recording/playback
+        // Reset translation state
+        console.log('Translation terminated due to component unmount');
+      }
+    };
   }, []);
 
   const playBase64Audio = async (base64String) => {
@@ -165,7 +209,10 @@ export default function Translation() {
   const stopAudio = async () => {
     try {
       if (sound) {
+        console.log('Stopping audio playback'); // Added logging
         await sound.stopAsync();
+        await sound.unloadAsync();
+        setSound(null);
         setIsPlaying(false);
       }
     } catch (error) {
@@ -197,6 +244,11 @@ export default function Translation() {
     }
 
     setIsLoading(true);
+    setIsTranslating(true);
+    
+    // Create a new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
     
     try {
       const apiEndpoint = "https://tts-api-kohl.vercel.app/translate_and_speak";
@@ -205,7 +257,6 @@ export default function Translation() {
         language: sourceLanguage.code,
         target_language: targetLanguage.name.toLowerCase(),
         voice_model: "meera"
-        // Removed audio_format to use default from server
       };
 
       const response = await fetch(apiEndpoint, {
@@ -214,12 +265,19 @@ export default function Translation() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
+        signal: abortController.signal // Add the abort signal here
       });
 
       if (response.ok) {
         const result = await response.json();
-        setAudioBase64(result.audio_data);
         setTranslatedText(result.translated_text);
+        
+        if (result.audio_data) {
+          setAudioBase64(result.audio_data);
+        }
+        
+        // Pass the translated text directly from the API response
+        await saveTranslationToHistory(inputText, result.translated_text, sourceLanguage, targetLanguage, result.audio_data);
         
         // Play audio after a short delay to ensure UI has updated
         setTimeout(() => {
@@ -234,11 +292,21 @@ export default function Translation() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch (error) {
-      console.error("Error:", error);
-      Alert.alert("Network Error", "Please check your internet connection and try again.");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      // Check if this is an abort error (user navigated away)
+      if (error.name === 'AbortError') {
+        console.log('Translation was cancelled');
+      } else {
+        console.error("Error:", error);
+        Alert.alert("Network Error", "Please check your internet connection and try again.");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     } finally {
       setIsLoading(false);
+      setIsTranslating(false);
+      // Clear the abort controller reference
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -246,6 +314,89 @@ export default function Translation() {
     setInputText("");
     inputRef.current?.focus();
   };
+
+  // Update the saveTranslationToHistory function to include audio data
+
+const saveTranslationToHistory = async (originalText, translatedText, sourceLanguage, targetLanguage, audioData) => {
+  if (!auth.currentUser) {
+    console.log("Not logged in, can't save translation");
+    return;
+  }
+  
+  try {
+    const userId = auth.currentUser.uid;
+    console.log('Saving translation for user:', userId);
+    
+    const historyRef = collection(db, "users", userId, "translations");
+    
+    const doc = {
+      originalText,
+      translatedText,
+      sourceLanguage,
+      targetLanguage,
+      timestamp: serverTimestamp(),
+      hasAudio: !!audioData,
+      audioData: audioData, // Store the base64 audio
+      source: 'translator'
+    };
+    
+    const docRef = await addDoc(historyRef, doc);
+    console.log('Translation saved with ID:', docRef.id);
+    
+  } catch (error) {
+    console.error('Error saving translation:', error);
+  }
+};
+
+  const handleCancelTranslation = () => {
+    stopAudio();
+    terminateTranslation();
+  };
+
+  // Update your useEffect to add tab change cleanup
+  useEffect(() => {
+    return () => {
+      // Clean up when component unmounts or tab changes
+      if (isTranslating || isPlaying) {
+        stopAudio();
+        terminateTranslation();
+      }
+    };
+  }, [isTranslating, isPlaying]);
+
+  // Add this useEffect to monitor the active tab
+  useEffect(() => {
+    // This will run whenever the active tab changes
+    if (activeTab !== 'Translator' && isPlaying) {
+      console.log('Tab changed, stopping audio playback');
+      stopAudio();
+    }
+  }, [activeTab, isPlaying]);
+
+  // Then use this useEffect to monitor tab changes
+  useEffect(() => {
+    // This will run whenever the active tab changes
+    if (activeTab && activeTab !== 'Translator' && (isPlaying || sound)) {
+      console.log('Tab changed from Translator, stopping audio');
+      stopAudio();
+    }
+  }, [activeTab, isPlaying, sound]);
+
+  // Also ensure your cleanup is comprehensive
+  useEffect(() => {
+    // Cleanup when component unmounts
+    return () => {
+      if (sound) {
+        console.log('Component unmounting, cleaning up audio');
+        sound.unloadAsync();
+      }
+      
+      // Make sure to abort any in-progress translations
+      if (isLoading || isTranslating) {
+        terminateTranslation();
+      }
+    };
+  }, [sound, isLoading, isTranslating]);
 
   return (
     <SafeAreaView style={styles.container}>

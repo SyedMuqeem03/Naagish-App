@@ -14,17 +14,24 @@ import {
   Platform,
   SafeAreaView,
 } from "react-native";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
+import { TranslationContext } from './_layout';
 import { LanguageSelector } from "@/components/ui/LanguageSelector";
 import { scale} from "@/utils/ResponsiveUtils";
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors } from "@/constants/Theme";
 
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../../firebaseConfig';
 
 const { width, height } = Dimensions.get("window");
 
 export default function Convo() {
+  // Add Translation Context
+  const { isTranslating, setIsTranslating, terminateTranslation, abortControllerRef, activeTab } = useContext(TranslationContext);
+  
+  // Your existing state variables
   const [isUp, setIsUp] = useState(false);
   const [base64String, setBase64String] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -41,8 +48,54 @@ export default function Convo() {
       if (sound) {
         sound.unloadAsync();
       }
+      
+      if (recording) {
+        try {
+          recording.stopAndUnloadAsync();
+        } catch (error) {
+          console.error("Error cleaning up recording:", error);
+        }
+      }
+      
+      if (isTranslating || isProcessing) {
+        terminateTranslation();
+      }
     };
-  }, [sound]);
+  }, [sound, recording, isTranslating, isProcessing]);
+
+  // Add this useEffect to handle tab changes
+  useEffect(() => {
+    // This will run whenever the active tab changes
+    if (activeTab && activeTab !== 'Conversation' && (isPlaying || recording || isProcessing)) {
+      console.log('Tab changed from Conversation, stopping all processes');
+      
+      // Stop audio playback
+      if (isPlaying || sound) {
+        stopBase64Audio();
+      }
+      
+      // Stop recording if in progress
+      if (recording) {
+        handleStopRecordingOnTabChange();
+      }
+      
+      // Reset processing states
+      setIsProcessing(false);
+      setIsLoading(false);
+      setIsTranslating(false);
+    }
+  }, [activeTab, isPlaying, recording, isProcessing]);
+
+  // Add this helper function to stop recording when switching tabs
+  const handleStopRecordingOnTabChange = async () => {
+    try {
+      console.log("Stopping recording due to tab change");
+      setRecording(undefined);
+      await recording.stopAndUnloadAsync();
+    } catch (error) {
+      console.error("Error stopping recording on tab change:", error);
+    }
+  };
 
   const playBase64Audio = async (base64String) => {
     try {
@@ -143,29 +196,58 @@ export default function Convo() {
       console.error("No transcript to translate");
       return;
     }
-
+  
     try {
+      // Create a new AbortController for this request
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+      
+      setIsTranslating(true);
       const apiEndpoint = "https://tts-api-id9n.vercel.app/translate_and_speak";
       const requestBody = createTranslationRequest(transcriptText, !isUp);
-
+  
       setIsLoading(true);
       const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
+        signal: abortController.signal // Add abort signal
       });
-
+  
       if (response.ok) {
         const jsonResponse = await response.json();
         setBase64String(jsonResponse.audio_data);
         setTranslatedText(jsonResponse.translated_text);
+        
+        // Determine speaker & listener for direct translation
+        const speakerLanguage = !isUp ? selectedLanguage : IsselectedLanguage;
+        const listenerLanguage = !isUp ? IsselectedLanguage : selectedLanguage;
+        
+        // Save to history
+        await saveTranslationToHistory(
+          transcriptText,
+          jsonResponse.translated_text,
+          speakerLanguage,
+          listenerLanguage,
+          jsonResponse.audio_data
+        );
+        
         await playBase64Audio(jsonResponse.audio_data);
       }
     } catch (error) {
-      console.error("Translation error:", error);
-      Alert.alert("Error", "Translation failed");
+      if (error.name === 'AbortError') {
+        console.log('Translation was aborted due to tab change');
+      } else {
+        console.error("Translation error:", error);
+        Alert.alert("Error", "Translation failed");
+      }
     } finally {
       setIsLoading(false);
+      setIsTranslating(false);
+      // Clear the abort controller reference
+      if (abortControllerRef.current) {
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -295,6 +377,20 @@ export default function Convo() {
             const jsonResponse = await response.json();
             setBase64String(jsonResponse.audio_data);
             setTranslatedText(jsonResponse.translated_text);
+            
+            // Determine speaker & listener based on isUp flag
+            const speakerLanguage = isUp ? selectedLanguage : IsselectedLanguage;
+            const listenerLanguage = isUp ? IsselectedLanguage : selectedLanguage;
+            
+            // Save translation to history
+            await saveTranslationToHistory(
+              transcriptionData.transcript,
+              jsonResponse.translated_text,
+              speakerLanguage,
+              listenerLanguage,
+              jsonResponse.audio_data
+            );
+            
             await playBase64Audio(jsonResponse.audio_data);
           }
         }
@@ -336,6 +432,48 @@ export default function Convo() {
   const handleOutsideClick = () => {
     if (isClicked) setIsClicked(false);
     if (Clicked) setClicked(false);
+  };
+
+  // Add this function to your Convo component
+  const saveTranslationToHistory = async (originalText, translatedText, sourceLanguage, targetLanguage, audioData) => {
+    if (!auth.currentUser) {
+      console.log('User not logged in, cannot save translation');
+      return;
+    }
+    
+    try {
+      const userId = auth.currentUser.uid;
+      console.log('Saving conversation translation for user:', userId);
+      
+      // Use the same subcollection path as main.jsx
+      const historyRef = collection(db, "users", userId, "translations");
+      
+      const translationData = {
+        sourceLanguage: {
+          name: sourceLanguage.name, 
+          code: sourceLanguage.code
+        },
+        targetLanguage: {
+          name: targetLanguage.name,
+          code: targetLanguage.code
+        },
+        originalText: originalText,
+        translatedText: translatedText,
+        timestamp: serverTimestamp(),
+        hasAudio: !!audioData,
+        audioData: audioData, // Store the base64 audio string
+        // Add a field to identify this came from conversation mode
+        source: 'conversation'
+      };
+      
+      const docRef = await addDoc(historyRef, translationData);
+      console.log('Conversation translation saved with ID:', docRef.id);
+      
+      // Optional: provide feedback that the conversation was saved
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error('Error saving conversation translation:', error);
+    }
   };
 
   return (
