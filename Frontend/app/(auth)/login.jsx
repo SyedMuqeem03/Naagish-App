@@ -10,7 +10,8 @@ import {
   Platform,
   ScrollView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  Animated
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -52,6 +53,12 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastOpacity = useState(new Animated.Value(0))[0];
+  const toastTranslateY = useState(new Animated.Value(20))[0];
+  const [showSuccess, setShowSuccess] = useState(false);
+  const successScale = useState(new Animated.Value(0.3))[0];
+  const successOpacity = useState(new Animated.Value(0))[0];
 
   // Update your Google auth request with an Android Client ID
   const [request, response, promptAsync] = Google.useAuthRequest({
@@ -73,7 +80,6 @@ export default function Login() {
       signInWithCredential(auth, credential)
         .then(async (result) => {
           const user = result.user;
-          console.log("Google sign-in successful:", user.uid);
           
           try {
             // First check if the user document exists
@@ -94,17 +100,12 @@ export default function Login() {
               });
             }
           } catch (dbError) {
-            console.warn("Failed to update user data:", dbError);
+            // Error handling without logging
           }
           
-          Alert.alert(
-            'Login Successful', 
-            'Welcome!',
-            [{ text: 'Continue', onPress: () => router.replace('/(tabs)/home') }]
-          );
+          showSuccessToast();
         })
         .catch((error) => {
-          console.error("Google sign-in error:", error);
           Alert.alert('Login Failed', 'Google sign-in was unsuccessful');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         })
@@ -165,37 +166,63 @@ export default function Login() {
             });
           }
         } catch (dbError) {
-          console.warn("Failed to update user data:", dbError);
+          // Error handling without logging
         }
         
-        console.log("User logged in:", user.uid);
-        
-        // Show success alert before navigation
-        Alert.alert(
-          'Login Successful', 
-          'Welcome back!',
-          [{ text: 'Continue', onPress: () => router.replace('/(tabs)/home') }]
-        );
+        // Show success toast before navigation
+        showSuccessToast();
       } catch (error) {
-        console.error("Login error details:", error.code, error.message);
+        // Enhanced error messages with better guidance
+        let errorMessage = '';
+        let errorTitle = 'Login Failed';
         
-        let errorMessage = 'Invalid email or password';
-        
-        // Handle specific Firebase errors
-        if (error.code === 'auth/user-not-found') {
-          errorMessage = 'No account found with this email.';
-        } else if (error.code === 'auth/wrong-password') {
-          errorMessage = 'Incorrect password.';
-        } else if (error.code === 'auth/too-many-requests') {
-          errorMessage = 'Too many failed login attempts. Try again later.';
-        } else if (error.code === 'auth/invalid-credential') {
-          errorMessage = 'Invalid login credentials.';
-        } else {
-          // For any other errors, show the actual error
-          errorMessage = `Error: ${error.code} - ${error.message}`;
+        // Handle specific Firebase errors with improved messages
+        switch(error.code) {
+          case 'auth/user-not-found':
+            errorTitle = 'Account Not Found';
+            errorMessage = 'We couldn\'t find an account with this email address. Please check your email or create a new account.';
+            break;
+            
+          case 'auth/wrong-password':
+            errorTitle = 'Incorrect Password';
+            errorMessage = 'The password you entered is incorrect. Please try again or use the "Forgot Password" option to reset it.';
+            break;
+            
+          case 'auth/invalid-email':
+            errorTitle = 'Invalid Email';
+            errorMessage = 'Please enter a valid email address in the format example@domain.com.';
+            break;
+            
+          case 'auth/invalid-credential':
+            errorTitle = 'Invalid Credentials';
+            errorMessage = 'Your login information doesn\'t match our records. Please verify both your email and password.';
+            break;
+            
+          case 'auth/too-many-requests':
+            errorTitle = 'Account Temporarily Locked';
+            errorMessage = 'Too many failed login attempts. For your security, this account has been temporarily locked. Please try again later or reset your password.';
+            break;
+            
+          case 'auth/network-request-failed':
+            errorTitle = 'Connection Error';
+            errorMessage = 'Unable to connect to our servers. Please check your internet connection and try again.';
+            break;
+            
+          case 'auth/user-disabled':
+            errorTitle = 'Account Disabled';
+            errorMessage = 'This account has been disabled. Please contact support for assistance.';
+            break;
+            
+          default:
+            errorTitle = 'Login Error';
+            errorMessage = 'Something went wrong with your login. Please try again later.';
+            // For debugging purposes, add the detailed error as a second paragraph
+            if (__DEV__) {
+              errorMessage += `\n\nTechnical details: ${error.code}`;
+            }
         }
         
-        Alert.alert('Login Failed', errorMessage);
+        Alert.alert(errorTitle, errorMessage);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       } finally {
         setIsLoading(false);
@@ -208,10 +235,79 @@ export default function Login() {
       setGoogleLoading(true);
       await promptAsync({ useProxy: true });
     } catch (error) {
-      console.error("Error starting Google sign-in:", error);
       Alert.alert('Error', 'Could not start Google sign-in process');
       setGoogleLoading(false);
     }
+  };
+
+  const showSuccessToast = () => {
+    // Show toast first
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setToastVisible(true);
+    
+    Animated.parallel([
+      Animated.timing(toastOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(toastTranslateY, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Wait for Firebase auth state to update before navigating
+    setTimeout(() => {
+      router.replace('/(tabs)/home');
+    }, 800); // Short delay to allow auth state to propagate
+    
+    // Auto-dismiss toast after delay
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(toastOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(toastTranslateY, {
+          toValue: -20,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setToastVisible(false);
+        toastOpacity.setValue(0);
+        toastTranslateY.setValue(20);
+      });
+    }, 1500);
+  };
+
+  const showSuccessAnimation = () => {
+    setShowSuccess(true);
+    
+    // Play success haptics
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    // Animate success screen
+    Animated.parallel([
+      Animated.timing(successScale, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(successOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Auto-transition to home after animation
+    setTimeout(() => {
+      router.replace('/(tabs)/home');
+    }, 1800);
   };
 
   return (
@@ -327,6 +423,44 @@ export default function Login() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      {toastVisible && (
+        <Animated.View
+          style={[
+            styles.successToast,
+            {
+              opacity: toastOpacity,
+              transform: [{ translateY: toastTranslateY }],
+            },
+          ]}
+        >
+          <View style={styles.successToastContent}>
+            <Ionicons name="checkmark-circle" size={24} color="#fff" />
+            <View style={styles.successToastTextContainer}>
+              <Text style={styles.successToastTitle}>Login Successful</Text>
+              <Text style={styles.successToastMessage}>Welcome back!</Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+      {showSuccess && (
+        <View style={styles.successOverlay}>
+          <Animated.View 
+            style={[
+              styles.successContent,
+              {
+                opacity: successOpacity,
+                transform: [{ scale: successScale }]
+              }
+            ]}
+          >
+            <View style={styles.successIconContainer}>
+              <Ionicons name="checkmark-circle" size={80} color="#fff" />
+            </View>
+            <Text style={styles.successTitle}>Login Successful!</Text>
+            <Text style={styles.successMessage}>Welcome back to Nagish</Text>
+          </Animated.View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -471,5 +605,65 @@ const styles = StyleSheet.create({
     color: '#007AF5',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  successToast: {
+    position: 'absolute',
+    bottom: 50,
+    left: 20,
+    right: 20,
+    backgroundColor: '#007AF5',
+    borderRadius: 12,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 6,
+    zIndex: 1000,
+  },
+  successToastContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  successToastTextContainer: {
+    marginLeft: 10,
+  },
+  successToastTitle: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  successToastMessage: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 14,
+    marginTop: 2,
+  },
+  successOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,122,245,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  successContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successIconContainer: {
+    marginBottom: 20,
+  },
+  successTitle: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  successMessage: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 18,
   },
 });

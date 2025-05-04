@@ -259,8 +259,8 @@ export default function TabLayout() {
               tabBarLabel: 'About',
               tabBarIcon: ({ focused }) => (
                 <View style={styles.tabIconContainer}>
-                  <MaterialIcons
-                    name="info-outline" // Changed from "about" to "info-outline"
+                  <Ionicons
+                    name="people-outline"
                     size={widthScale(24)}
                     color={focused ? "#007AF5" : "gray"}
                   />

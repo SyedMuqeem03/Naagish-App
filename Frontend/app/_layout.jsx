@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { router, useSegments } from 'expo-router';
+import { View, ActivityIndicator, Text } from 'react-native';
 
 
 
@@ -18,21 +19,53 @@ export default function RootLayout() {
 function InitialLayout() {
   const { user, loading } = useAuth();
   const segments = useSegments();
+  const [hasNavigated, setHasNavigated] = useState(false);
   
   useEffect(() => {
-    if (loading) return;
+    // If authentication is still loading, do nothing yet
+    if (loading) {
+      console.log("Auth state is still loading...");
+      return;
+    }
     
+    // Prevent multiple navigations
+    if (hasNavigated) return;
+    
+    // Only redirect if not already in the correct section
     const inAuthGroup = segments[0] === '(auth)';
+    const inTabsGroup = segments[0] === '(tabs)';
     
     if (!user && !inAuthGroup) {
-      // Redirect to login if user isn't authenticated
+      console.log("No authenticated user found, redirecting to login");
+      setHasNavigated(true);
       router.replace('/(auth)/login');
-    } else if (user && inAuthGroup) {
-      // Redirect to main if user is authenticated but still in auth group
+    } else if (user && !inTabsGroup) {
+      console.log("User is authenticated, redirecting to home");
+      setHasNavigated(true);
       router.replace('/(tabs)/home');
     }
   }, [user, loading, segments]);
   
+  if (loading) {
+    return (
+      <View style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f5f5f7'
+      }}>
+        <ActivityIndicator size="large" color="#007AF5" />
+        <Text style={{
+          marginTop: 15,
+          fontSize: 16,
+          color: '#666'
+        }}>
+          Loading Nagish...
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <Stack screenOptions={{ headerShown: false }} />
   );

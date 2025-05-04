@@ -3,12 +3,10 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, Animated, Dimensions, 
 import { useRouter } from 'expo-router';
 import { Ionicons, FontAwesome5, MaterialIcons, SimpleLineIcons } from '@expo/vector-icons';
 import { auth, db } from '../../firebaseConfig';
-import { signOut } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { signOut, updateDoc } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { LinearGradient } from 'expo-linear-gradient';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const { width } = Dimensions.get('window');
 
@@ -22,7 +20,6 @@ const DrawerMenu = ({ visible, onClose }) => {
   const [editedBio, setEditedBio] = useState('');
   const [saving, setSaving] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
-  const [profileHighlighted, setProfileHighlighted] = useState(false);
 
   // Fetch user data when drawer opens
   useEffect(() => {
@@ -80,48 +77,22 @@ const DrawerMenu = ({ visible, onClose }) => {
   };
 
   const openProfileEdit = () => {
-    if (!userData) {
-      console.log("Cannot open profile edit: No user data");
-      Alert.alert("Error", "Unable to load profile data. Please try again later.");
-      return;
-    }
-    
-    console.log("Opening profile edit, userData:", userData);
     setEditedName(userData?.displayName || '');
     setEditedBio(userData?.bio || '');
     setProfileImage(userData?.profileImage || null);
     setProfileModalVisible(true);
   };
 
-  // Add this useEffect to monitor modal visibility
-  useEffect(() => {
-    if (profileModalVisible) {
-      console.log("Profile modal is now visible");
-    }
-  }, [profileModalVisible]);
-
-  // Update the selectProfileImage function to use the new API
   const selectProfileImage = async () => {
-    try {
-      // Try to detect which API version is available
-      const mediaTypeOption = ImagePicker.MediaType?.Images || ImagePicker.MediaTypeOptions.Images;
-      
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: mediaTypeOption,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.5,
-      });
-      
-      if (!result.canceled) {
-        setProfileImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error("Error selecting image:", error);
-      Alert.alert(
-        "Image Selection Failed", 
-        "There was a problem selecting your image. Please try again."
-      );
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+    
+    if (!result.canceled) {
+      setProfileImage(result.assets[0].uri);
     }
   };
 
@@ -131,60 +102,26 @@ const DrawerMenu = ({ visible, onClose }) => {
     setSaving(true);
     try {
       const userRef = doc(db, 'users', auth.currentUser.uid);
-      let profileImageUrl = profileImage;
-      
-      // Check if the profile image is a local URI (new image selected)
-      if (profileImage && profileImage.startsWith('file://')) {
-        // Upload the image to Firebase Storage
-        const storage = getStorage();
-        const imageRef = ref(storage, `profile_images/${auth.currentUser.uid}_${Date.now()}`);
-        
-        // Convert URI to blob
-        const response = await fetch(profileImage);
-        const blob = await response.blob();
-        
-        // Upload blob to Firebase Storage
-        const snapshot = await uploadBytes(imageRef, blob);
-        
-        // Get the download URL
-        profileImageUrl = await getDownloadURL(snapshot.ref);
-        console.log('Image uploaded. Download URL:', profileImageUrl);
-      }
-      
-      // Create updated user data with the storage URL, not the local URI
-      const updatedUserData = {
-        displayName: editedName.trim(),
-        bio: editedBio.trim(),
-        profileImage: profileImageUrl,
+      await updateDoc(userRef, {
+        displayName: editedName,
+        bio: editedBio,
+        profileImage: profileImage,
         updatedAt: new Date()
-      };
-      
-      // Update Firestore
-      await updateDoc(userRef, updatedUserData);
-      
-      // Update local state with all existing user data preserved
-      setUserData({
-        ...userData,
-        ...updatedUserData
       });
       
-      // Close modal and show success feedback
+      // Update local state
+      setUserData({
+        ...userData,
+        displayName: editedName,
+        bio: editedBio,
+        profileImage: profileImage
+      });
+      
       setProfileModalVisible(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      // Show success message with the updated name
-      Alert.alert(
-        'Profile Updated', 
-        `Your profile has been successfully updated, ${editedName || 'User'}!`
-      );
-      
-      // Highlight the updated profile area briefly
-      setProfileHighlighted(true);
-      setTimeout(() => setProfileHighlighted(false), 2000);
-      
     } catch (error) {
-      console.error("Error updating profile:", error, error.stack);
-      Alert.alert('Error', 'Failed to update profile: ' + error.message);
+      console.error("Error updating profile:", error);
+      Alert.alert('Error', 'Failed to update profile');
     } finally {
       setSaving(false);
     }
@@ -194,7 +131,6 @@ const DrawerMenu = ({ visible, onClose }) => {
 
   return (
     <>
-      {/* Drawer Modal */}
       <Modal
         transparent={true}
         visible={visible}
@@ -208,11 +144,8 @@ const DrawerMenu = ({ visible, onClose }) => {
               { transform: [{ translateX: slideAnim }] }
             ]}
           >
-            {/* Profile Section with highlight effect */}
-            <View style={[
-              styles.profileSection,
-              profileHighlighted && styles.profileSectionHighlighted
-            ]}>
+            {/* Profile Section */}
+            <View style={styles.profileSection}>
               <View style={styles.profileHeader}>
                 <View style={styles.avatar}>
                   {userData?.profileImage ? (
@@ -236,20 +169,13 @@ const DrawerMenu = ({ visible, onClose }) => {
               <Text style={styles.userName}>
                 {userData?.displayName || 'User'}
               </Text>
-              
-              {userData?.bio && (
-                <Text style={styles.userBio} numberOfLines={2}>
-                  {userData.bio}
-                </Text>
-              )}
-              
               <Text style={styles.userEmail}>
                 {auth.currentUser?.email || ''}
               </Text>
               
               <TouchableOpacity 
                 style={styles.editProfileButton}
-                onPress={openProfileEdit}
+                onPress={openProfileEdit} // Changed to use our new function
               >
                 <Text style={styles.editProfileText}>Edit Profile</Text>
               </TouchableOpacity>
@@ -292,7 +218,7 @@ const DrawerMenu = ({ visible, onClose }) => {
                 style={styles.menuItem} 
                 onPress={() => navigateTo('/(tabs)/about')}
               >
-                <MaterialIcons name="info-outline" size={24} color="#333" />
+                <MaterialIcons name="people-outline" size={24} color="#333" />
                 <Text style={styles.menuItemText}>About</Text>
               </TouchableOpacity>
             </View>
@@ -316,101 +242,123 @@ const DrawerMenu = ({ visible, onClose }) => {
         </View>
       </Modal>
 
-      {/* Profile Edit Modal - Updated with styles from profile.jsx */}
+      {/* Add the Profile Edit Modal */}
       <Modal
-        visible={profileModalVisible}
         transparent={true}
+        visible={profileModalVisible}
         animationType="slide"
         onRequestClose={() => setProfileModalVisible(false)}
       >
-        <View style={styles.profileModalOverlay}>
-          <View style={styles.profileModalCard}>
+        <View style={styles.profileModalContainer}>
+          <View style={styles.profileModalContent}>
             <View style={styles.profileModalHeader}>
               <Text style={styles.profileModalTitle}>Edit Profile</Text>
-              <TouchableOpacity 
-                onPress={() => setProfileModalVisible(false)}
-                style={styles.profileCloseButton}
-              >
-                <MaterialIcons name="close" size={24} color="#555" />
+              <TouchableOpacity onPress={() => setProfileModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.avatarContainer}>
-                <TouchableOpacity onPress={selectProfileImage}>
+            <ScrollView style={styles.profileForm}>
+              {/* Profile Image Section with improved UI */}
+              <View style={styles.profileImageSection}>
+                <TouchableOpacity 
+                  style={styles.profileImageContainer}
+                  onPress={selectProfileImage}
+                >
                   {profileImage ? (
-                    <Image 
-                      source={{ uri: profileImage }} 
-                      style={styles.profileAvatarImage} 
-                    />
+                    <Image source={{ uri: profileImage }} style={styles.profileImagePreview} />
                   ) : (
-                    <View style={styles.profileAvatar}>
-                      <Text style={styles.profileAvatarText}>
-                        {editedName ? editedName[0].toUpperCase() : auth.currentUser?.email[0].toUpperCase()}
+                    <View style={styles.profileImagePlaceholder}>
+                      <Text style={styles.profileImagePlaceholderText}>
+                        {editedName ? editedName[0].toUpperCase() : 'U'}
                       </Text>
                     </View>
                   )}
-                  <View style={styles.editImageButton}>
+                  <View style={styles.profileImageEditBadge}>
                     <Ionicons name="camera" size={18} color="#fff" />
                   </View>
                 </TouchableOpacity>
-              </View>
-              
-              <Text style={styles.profileEmail}>{auth.currentUser?.email}</Text>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Display Name</Text>
-                <View style={styles.inputContainer}>
-                  <MaterialIcons name="person" size={22} color="#666" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Your name"
-                    value={editedName}
-                    onChangeText={setEditedName}
-                  />
+                
+                {/* Add a text prompt to make it clearer */}
+                <Text style={styles.imageHelperText}>
+                  Tap to change profile picture
+                </Text>
+                
+                {/* Add buttons for different image selection options */}
+                <View style={styles.imageButtonsContainer}>
+                  <TouchableOpacity 
+                    style={styles.imageOptionButton}
+                    onPress={selectProfileImage}
+                  >
+                    <Ionicons name="images-outline" size={18} color="#007AF5" />
+                    <Text style={styles.imageOptionText}>Gallery</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.imageOptionButton}
+                    onPress={() => {
+                      Alert.alert("Coming Soon", "This feature will be available in the next update!");
+                    }}
+                  >
+                    <Ionicons name="camera-outline" size={18} color="#007AF5" />
+                    <Text style={styles.imageOptionText}>Camera</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Bio</Text>
-                <View style={[styles.inputContainer, {height: 100}]}>
-                  <MaterialIcons name="info" size={22} color="#666" style={[styles.inputIcon, {paddingTop: 10}]} />
-                  <TextInput
-                    style={[styles.input, {textAlignVertical: 'top', height: 100, paddingTop: 10}]}
-                    placeholder="A short bio about yourself"
-                    value={editedBio}
-                    onChangeText={setEditedBio}
-                    multiline
-                    numberOfLines={4}
-                  />
-                </View>
-              </View>
+              {/* Name field with improved styling and helper text */}
+              <Text style={styles.inputLabel}>Your Name</Text>
+              <TextInput
+                style={[styles.input, {fontSize: 18}]}
+                value={editedName}
+                onChangeText={setEditedName}
+                placeholder="Enter your name"
+                autoCapitalize="words"
+                maxLength={50}
+              />
+              <Text style={styles.inputHelper}>
+                This name will be visible to other users
+              </Text>
+
+              <Text style={styles.inputLabel}>Bio</Text>
+              <TextInput
+                style={[styles.input, styles.bioInput]}
+                value={editedBio}
+                onChangeText={setEditedBio}
+                placeholder="Tell us about yourself"
+                multiline
+                numberOfLines={3}
+              />
               
-              <View style={styles.profileButtonRow}>
+              <Text style={styles.emailDisplay}>
+                Email: {auth.currentUser?.email}
+              </Text>
+              <Text style={styles.emailNotice}>
+                Email cannot be changed
+              </Text>
+
+              <View style={styles.profileModalActions}>
                 <TouchableOpacity 
-                  style={[styles.profileButton, styles.profileCancelButton]}
+                  style={[styles.profileModalButton, styles.cancelButton]}
                   onPress={() => setProfileModalVisible(false)}
                 >
-                  <Text style={styles.profileCancelButtonText}>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={[styles.profileButton, styles.profileSaveButton]}
+                  style={[
+                    styles.profileModalButton,
+                    styles.saveButton,
+                    saving && styles.savingButton
+                  ]}
                   onPress={saveProfile}
                   disabled={saving}
                 >
-                  <LinearGradient
-                    colors={['#007AF5', '#0055C9']}
-                    style={styles.buttonGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  >
-                    {saving ? (
-                      <ActivityIndicator size="small" color="white" />
-                    ) : (
-                      <Text style={styles.profileSaveButtonText}>Save Changes</Text>
-                    )}
-                  </LinearGradient>
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Save Changes</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -422,7 +370,6 @@ const DrawerMenu = ({ visible, onClose }) => {
 };
 
 const styles = StyleSheet.create({
-  // Existing drawer styles
   overlay: {
     flex: 1,
     flexDirection: 'row',
@@ -444,14 +391,6 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
-  },
-  profileSectionHighlighted: {
-    backgroundColor: '#0068D6', // Slightly different blue for highlight
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
   profileHeader: {
     flexDirection: 'row',
@@ -484,14 +423,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginTop: 5,
-  },
-  userBio: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13,
-    marginTop: 3,
-    marginBottom: 3,
-    fontStyle: 'italic',
-    maxWidth: '90%',
   },
   userEmail: {
     color: 'rgba(255,255,255,0.8)',
@@ -549,26 +480,27 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
   },
-  
-  // New profile modal styles from profile.jsx
-  profileModalOverlay: {
+  profileModalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
-  profileModalCard: {
+  profileModalContent: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 30,
+    borderRadius: 15,
+    width: '100%',
     maxHeight: '80%',
-    elevation: 5,
+    padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+    elevation: 5,
   },
   profileModalHeader: {
     flexDirection: 'row',
@@ -580,19 +512,91 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
   },
   profileModalTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
   },
-  profileCloseButton: {
-    padding: 5,
+  profileForm: {
+    flex: 1,
   },
-  avatarContainer: {
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 6,
+    marginTop: 12,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+  },
+  bioInput: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  emailDisplay: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 15,
+  },
+  emailNotice: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  profileModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 30,
+    marginBottom: 10,
+  },
+  profileModalButton: {
+    borderRadius: 8,
+    padding: 15,
+    flex: 1,
     alignItems: 'center',
-    marginBottom: 15,
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f8f8f8',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginRight: 10,
+  },
+  cancelButtonText: {
+    color: '#555',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButton: {
+    backgroundColor: '#007AF5',
+  },
+  savingButton: {
+    opacity: 0.7,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  profileImageContainer: {
+    alignSelf: 'center',
+    marginVertical: 20,
     position: 'relative',
   },
-  profileAvatar: {
+  profileImagePreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#eee',
+  },
+  profileImagePlaceholder: {
     width: 100,
     height: 100,
     borderRadius: 50,
@@ -602,19 +606,12 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: '#eee',
   },
-  profileAvatarImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: '#eee',
-  },
-  profileAvatarText: {
-    color: '#fff',
-    fontSize: 40,
+  profileImagePlaceholderText: {
+    fontSize: 36,
     fontWeight: 'bold',
+    color: '#fff',
   },
-  editImageButton: {
+  profileImageEditBadge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
@@ -622,83 +619,42 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 3,
     borderColor: '#fff',
   },
-  profileEmail: {
-    fontSize: 16,
+  profileImageSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  imageHelperText: {
+    fontSize: 14,
     color: '#666',
-    textAlign: 'center',
-    marginBottom: 25,
+    marginTop: 10,
   },
-  inputGroup: {
-    marginBottom: 16,
+  imageButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 15,
   },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-    marginLeft: 2,
-  },
-  inputContainer: {
+  imageOptionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f7',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    height: 55,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
   },
-  inputIcon: {
-    marginRight: 10,
+  imageOptionText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#007AF5',
   },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-  },
-  profileButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 25,
-    marginBottom: 10,
-  },
-  profileButton: {
-    height: 50,
-    borderRadius: 10,
-    flex: 1,
-    overflow: 'hidden',
-    marginHorizontal: 5,
-  },
-  profileCancelButton: {
-    backgroundColor: '#f5f5f7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  profileCancelButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  profileSaveButton: {
-    overflow: 'hidden',
-  },
-  profileSaveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  buttonGradient: {
-    height: '100%',
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
+  inputHelper: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 5,
   },
 });
 
