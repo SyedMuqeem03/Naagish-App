@@ -137,4 +137,4 @@ This project is licensed under the MIT License. See the LICENSE file for more de
 
 ## Contact
 
-For any queries, please contact [shaikmuhammadsami04@gmail.com].
+For any queries, please contact [smuqeem03@gmail.com].
